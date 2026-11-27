@@ -1,0 +1,968 @@
+<title>Radiografía de Cobranza</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<style>
+/* Concepto: tablero de lectura. Franja superior con carga del Excel, secciones numeradas por orden de la pregunta (clasificar → embudo → pagos → técnicas → palabras → detalle). */
+:root{
+  --bg:#f4f6fb; --surface:#ffffff; --surface2:#eef1f8; --ink:#13172a; --muted:#59627a; --line:#dfe4ef;
+  --accent:#257de0; --accent-ink:#ffffff;
+  --c-personal:#6a4ce2; --c-sinresp:#98a1b8; --c-nego:#257de0;
+  --c-pago:#008a17; --c-probable:#00b894; --c-acuerdo:#f47230; --c-interes:#257de0; --c-rechazo:#ec4647; --c-solo:#98a1b8;
+  --adv-bg:#e6f0fd; --cli-bg:#f1f3f9; --warn-bg:#fff6e0; --warn-ink:#6b4a00;
+  --f-body:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; --f-head:'Space Grotesk','Inter',system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e111c; --surface:#161a28; --surface2:#1d2234; --ink:#eceff8; --muted:#9aa3bb; --line:#2a3048;
+  --accent:#338ced; --c-personal:#9887ef; --c-sinresp:#6f7894; --c-nego:#338ced;
+  --c-pago:#0aac23; --c-probable:#00a888; --c-acuerdo:#e76624; --c-interes:#338ced; --c-rechazo:#eb6263; --c-solo:#6f7894;
+  --adv-bg:#1b2c47; --cli-bg:#222840; --warn-bg:#352a0d; --warn-ink:#f3d58a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e111c; --surface:#161a28; --surface2:#1d2234; --ink:#eceff8; --muted:#9aa3bb; --line:#2a3048;
+  --accent:#338ced; --c-personal:#9887ef; --c-sinresp:#6f7894; --c-nego:#338ced;
+  --c-pago:#0aac23; --c-probable:#00a888; --c-acuerdo:#e76624; --c-interes:#338ced; --c-rechazo:#eb6263; --c-solo:#6f7894;
+  --adv-bg:#1b2c47; --cli-bg:#222840; --warn-bg:#352a0d; --warn-ink:#f3d58a; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:14px/1.55 var(--f-body);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 48px}
+.wrap{max-width:1180px;margin:0 auto}
+h1,h2,h3{font-family:var(--f-head);margin:0;letter-spacing:-.01em;text-wrap:balance}
+h1{font-size:clamp(24px,4vw,34px);line-height:1.15}
+h2{font-size:21px;margin-bottom:4px}
+h3{font-size:15px}
+p{margin:0}
+.muted{color:var(--muted)}
+.top{padding-top:28px;display:flex;gap:20px;align-items:flex-end;justify-content:space-between;flex-wrap:wrap}
+.top p{max-width:60ch;margin-top:6px}
+.theme-btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:6px 10px;font:inherit;cursor:pointer}
+.drop{margin-top:20px;border:2px dashed var(--line);background:var(--surface);border-radius:14px;padding:26px 20px;display:flex;gap:18px;align-items:center;justify-content:space-between;flex-wrap:wrap;transition:border-color .15s,background .15s}
+.drop.over{border-color:var(--accent);background:var(--surface2)}
+.drop b{font-family:var(--f-head);font-size:17px}
+.btn{background:var(--accent);color:var(--accent-ink);border:0;border-radius:9px;padding:10px 18px;font:600 14px var(--f-body);cursor:pointer}
+.btn:hover{filter:brightness(1.08)}
+.btn.ghost{background:var(--surface2);color:var(--ink);border:1px solid var(--line)}
+.btn:focus-visible,.theme-btn:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible,th button:focus-visible,.row:focus-visible,.xls-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.status{margin-top:10px;min-height:20px;font-size:13px}
+.status.err{color:var(--c-rechazo)}
+.preview{margin-top:26px;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.preview div{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.preview b{display:block;font-family:var(--f-head);margin-bottom:2px}
+nav.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);margin:18px 0 0;padding:8px 0;display:flex;gap:6px;overflow-x:auto;border-bottom:1px solid var(--line);scrollbar-width:thin}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+nav.tabs a{white-space:nowrap;text-decoration:none;color:var(--muted);padding:6px 11px;border-radius:999px;font-weight:500;font-size:13px}
+nav.tabs a:hover{background:var(--surface2);color:var(--ink)}
+section.blk{margin-top:34px;scroll-margin-top:60px}
+.lead{color:var(--muted);max-width:75ch;margin-bottom:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px}
+.grid{display:grid;gap:12px}
+.kpis{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;min-width:0}
+.kpi .n{font:700 28px/1.1 var(--f-head);font-variant-numeric:tabular-nums}
+.kpi .l{font-size:12.5px;color:var(--muted);margin-top:4px}
+.kpi .s{font-size:12px;margin-top:6px;color:var(--muted)}
+.kpi .dot{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:6px;vertical-align:baseline}
+.two{grid-template-columns:repeat(auto-fit,minmax(min(100%,430px),1fr))}
+.stack{display:flex;height:34px;border-radius:8px;overflow:hidden;gap:2px;background:var(--surface)}
+.stack>div{min-width:3px;transition:flex .3s}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:12px;font-size:13px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
+.legend b{font-variant-numeric:tabular-nums}
+.funnel .f{display:grid;grid-template-columns:150px 1fr 120px;gap:12px;align-items:center;margin:9px 0}
+.funnel .bar{height:26px;background:var(--surface2);border-radius:6px;overflow:hidden}
+.funnel .bar>div{height:100%;border-radius:0 6px 6px 0}
+.funnel .v{font-variant-numeric:tabular-nums;font-weight:600;text-align:right}
+.funnel .v small{display:block;color:var(--muted);font-weight:400;font-size:11.5px}
+.funnel .t{font-weight:500}
+.funnel .t small{display:block;color:var(--muted);font-weight:400;font-size:11.5px;line-height:1.3}
+@media(max-width:560px){.funnel .f{grid-template-columns:1fr auto}.funnel .bar{grid-column:1/-1;order:3}}
+.states{display:grid;gap:8px}
+.state{display:grid;grid-template-columns:14px 1fr auto;gap:10px;align-items:start;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.state i{width:12px;height:12px;border-radius:4px;margin-top:4px}
+.state b{font-weight:600}
+.state small{display:block;color:var(--muted);font-size:12.5px}
+.state .num{font:700 20px var(--f-head);text-align:right;font-variant-numeric:tabular-nums}
+.state .num small{font:400 12px var(--f-body)}
+.callout{background:var(--warn-bg);color:var(--warn-ink);border-radius:10px;padding:11px 14px;font-size:13px;margin-top:12px}
+.insights{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.insights li{padding:10px 14px;border-left:3px solid var(--accent);background:var(--surface);border-radius:0 8px 8px 0;border-top:1px solid var(--line);border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+.tech{display:grid;grid-template-columns:minmax(190px,1.1fr) minmax(190px,1fr) minmax(220px,1.3fr);gap:14px;padding:14px 0;border-top:1px solid var(--line);align-items:start}
+.tech:first-child{border-top:0}
+.tech h3{margin-bottom:2px}
+.tech .d{font-size:12.5px;color:var(--muted)}
+.mini{display:grid;gap:6px;font-size:12.5px}
+.mini .r{display:grid;grid-template-columns:78px 1fr 44px;gap:8px;align-items:center}
+.mini .b{height:9px;background:var(--surface2);border-radius:5px;overflow:hidden}
+.mini .b>div{height:100%;border-radius:5px}
+.mini .r span:last-child{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+.quote{font-size:12.5px;color:var(--muted);border-left:2px solid var(--line);padding-left:10px;max-height:6.2em;overflow:hidden;font-style:italic}
+@media(max-width:820px){.tech{grid-template-columns:1fr}}
+.chips{display:flex;flex-wrap:wrap;gap:7px;align-items:baseline}
+.chip{background:var(--surface2);border:1px solid var(--line);border-radius:999px;padding:3px 11px;line-height:1.3;white-space:nowrap}
+.chip small{color:var(--muted);margin-left:5px;font-size:.78em}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:8px 12px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap;font-variant-numeric:tabular-nums}
+th:first-child,td:first-child{text-align:left;white-space:normal}
+th{font-weight:600;color:var(--muted);font-size:12px;background:var(--surface2);position:sticky;top:0}
+th button{all:unset;cursor:pointer;font:inherit;color:inherit}
+tr:last-child td{border-bottom:0}
+.pos{color:var(--c-pago);font-weight:600}.neg{color:var(--c-rechazo);font-weight:600}
+.chart{width:100%;height:auto;display:block}
+.chart text{fill:var(--muted);font:11px var(--f-body)}
+.tip{position:fixed;z-index:50;background:var(--ink);color:var(--bg);padding:6px 10px;border-radius:7px;font-size:12px;pointer-events:none;max-width:260px;display:none}
+.filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+select,input[type=search]{background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit;min-width:0}
+input[type=search]{flex:1 1 220px}
+.row{display:grid;grid-template-columns:150px 110px 100px 1fr 60px;gap:10px;padding:9px 12px;border-bottom:1px solid var(--line);cursor:pointer;align-items:center;font-size:13px}
+.row:hover{background:var(--surface2)}
+.row>*{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pill{display:inline-block;border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:600;color:#fff;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:700px){.row{grid-template-columns:1fr 1fr}.row>:nth-child(4){grid-column:1/-1}}
+.modal{position:fixed;inset:0;background:rgba(8,10,20,.6);z-index:40;display:none;padding:max(16px,env(safe-area-inset-top,0px)) 16px 16px;overflow:auto}
+.modal.open{display:block}
+.sheet{background:var(--surface);max-width:760px;margin:0 auto;border-radius:14px;border:1px solid var(--line);overflow:hidden}
+.sheet header{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;gap:12px;justify-content:space-between;align-items:flex-start}
+.chat{padding:14px 18px;display:grid;gap:7px;max-height:60vh;overflow:auto}
+.msg{max-width:86%;padding:7px 11px;border-radius:12px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px}
+.msg small{display:block;color:var(--muted);font-size:10.5px;margin-top:2px}
+.msg.a{background:var(--adv-bg);justify-self:end;border-bottom-right-radius:3px}
+.msg.c{background:var(--cli-bg);justify-self:start;border-bottom-left-radius:3px}
+.ev{padding:12px 18px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted);display:grid;gap:4px}
+details.meth{margin-top:34px}
+details summary{cursor:pointer;font-weight:600;font-family:var(--f-head);font-size:17px}
+details ul{color:var(--muted);padding-left:20px}
+details li{margin:5px 0}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+
+/* Botón compacto de descarga Excel en cada ítem */
+.xls-btn{display:inline-flex;align-items:center;gap:4px;margin-top:6px;padding:3px 8px;border-radius:6px;border:1px solid #16a34a55;background:#16a34a18;color:#15803d;font:600 11px var(--f-body);cursor:pointer;vertical-align:middle;line-height:1.2}
+.xls-btn:hover{background:#16a34a2b}
+.xls-btn.inline{margin-top:0;margin-left:6px;padding:2px 7px}
+:root[data-theme="dark"] .xls-btn{color:#4ade80;border-color:#4ade8055;background:#4ade801a}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .xls-btn{color:#4ade80;border-color:#4ade8055;background:#4ade801a}}
+</style>
+
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>Radiografía de Cobranza</h1>
+      <p class="muted">Sube el Excel de conversaciones y obtén al instante qué chats son personales, cuántos clientes se interesaron, quién acordó y pagó, qué técnicas y palabras se usaron.</p>
+    </div>
+    <button class="theme-btn" id="themeBtn" type="button" aria-label="Cambiar tema claro u oscuro">Tema</button>
+  </div>
+
+  <div class="drop" id="drop">
+    <div><b>Adjunta el Excel de conversaciones (.xlsx)</b><div class="muted">Arrastra el archivo aquí o elígelo. Se procesa en tu navegador; no se envía a ningún servidor.</div></div>
+    <div><input type="file" id="file" accept=".xlsx,.xls,.csv" hidden><button class="btn" id="pick" type="button">Elegir archivo</button></div>
+  </div>
+  <div class="status muted" id="status" role="status" aria-live="polite"></div>
+
+  <div id="empty">
+    <div class="preview">
+      <div><b>Separa los chats</b><span class="muted">Conversaciones personales o internas, gestiones sin respuesta y negociaciones reales con clientes.</span></div>
+      <div><b>Mide el embudo</b><span class="muted">Contactados, respondieron, interesados, acuerdos de pago, pagos y quiénes no pagaron.</span></div>
+      <div><b>Lee la persuasión</b><span class="muted">Técnicas de cierre, palabras que convencen, frases previas al «ok» del cliente y objeciones.</span></div>
+      <div><b>Audita cada caso</b><span class="muted">Explorador con filtros y el chat completo, con la evidencia que llevó a cada clasificación.</span></div>
+    </div>
+  </div>
+
+  <div id="report" hidden></div>
+</div>
+<div class="tip" id="tip"></div>
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-label="Detalle de la conversación"></div>
+
+<script>
+/* ===== Motor de análisis (corre 100% en el navegador) ===== */
+const RX = {
+  broadcast: /propuesta especial de descuento|GRAN CAMPA|EXCELENTE OPORTUNIDAD|Último Plazo para Cumplimiento|alternativa de conciliaci|proceso de conciliaci|DEMANDA por obligaci|asesora de cobranza del Estudio|le informamos que la obligaci|nos comunicamos con usted por encargo|te ayudamos a solucionar|su caso ha sido evaluado|[uú]ltima oportunidad antes de pasar|Somos el estudio RUC|por qu[eé] dej[oó] de cumplir|TE INVITA A CONCILIAR|concilia(r|ci[oó]n) (de )?(tu|su) deuda|se le brinda una oportunidad/i,
+  debt: /pago|pagar|plazo|cuenta|conciliar|consiliar|apoyo|pendiente|dinero|soles|s\/|yape|deuda|saldo|descuento|adeudo|liquidaci|cobranza|martec|cuotas?\b|acuerdo de pago|propuesta|bcp|banco de|cr[eé]dito|tarjeta|monto|campa[ñn]a|embargo|infocorp|carta|cancelar|cancelaci|regulariz|obligaci|pr[eé]stamo|mora|dni/i,
+  personal: /\b(hijo|hijita|mamacita|mam[aá]|pap[aá]|hermano|beb[eé]|coca cola|audifonos|hambre|jugo|galleta|caf[eé]|baño|xd+|xdd+|jaj+a*|jeje+|amiga|amigo|bb|hermana|almuerz|desayun|pastilla|az[uú]car|chocotej|frugos|jiromy|bit[aá]cora|refrigerio|mamita|cari[ñn]o|te quiero|jajaja|cumple|cena|chifa|pollito)/gi,
+  internal: /EQUIPO:|supervis|feedback|[aá]rea de calidad|horarios? de ingreso|capacitaci|pre ?aprobado|en espera de aprobaci|tienes marciano|comunicado importante|ponle posible|bandeja|reasign|pdp\b|\bsube\b|cierre de mes|meta del d[ií]a/gi,
+  interest: /me interesa|interesad|quiero (pagar|cancelar|saber|conocer|informaci|regularizar|solucionar|arreglar|la carta|mi carta|mi constancia|ponerme)|necesito (informaci|saber|pagar|regularizar|cancelar|la carta|mi carta|ayuda|solucionar)|(cu[aá]nto|cuanto) (es|ser[ií]a|debo|tengo|me queda|pago|puedo)|monto|descuento|propuesta|cuotas?\b|fraccion|puedo pagar|(c[oó]mo|como) (pago|puedo pagar|hago|se paga)|n[uú]mero de cuenta|en qu[eé] cuenta|env[ií]e?(me)? (el |la |los |las )?(acuerdo|correo|detalle|informaci|propuesta|cronograma)|ll[aá]meme|ll[aá]mame|(pueden|puede|podr[ií]an?) llamar(me)?|me llaman a|evaluar|voy a (pagar|cancelar|depositar|abonar|regularizar|cumplir)|pagar[eé]|cancelar[eé]|depositar[eé]|abonar[eé]|de acuerdo|acepto|conforme|informaci[oó]n de mi deuda|carta de no adeudo|constancia de no adeudo|quiero (el )?descuento|hasta cu[aá]ndo|vigencia/i,
+  noPuede: /no tengo|no puedo|no cuento|sin trabajo|desemple|sin empleo|no hay (pago|dinero|plata)|no me alcanza|no estoy trabajando|jubilad|enferm|dif[ií]cil|situaci[oó]n econ|mal momento|quebr|no cuento con|sin ingresos|no tengo trabajo/i,
+  desconoce: /n[uú]mero equivocado|equivocad|no soy (el|la|esa|ese|yo|titular|quien)|no conozco|no es mi|no (tengo|poseo|mantengo) (ninguna |alguna )?deuda|no debo|no le debo|fraude|estafa|suplant|persona equivocada/i,
+  molesto: /no me (escriban|molesten|llamen|vuelvan|sigan)|dejen de|denuncia|indecopi|acoso|reclamo|queja|spam|bloque(o|ar)|harto|cansad/i,
+  noInteres: /no me interesa|no (quiero|deseo) (pagar|nada|saber)|no pagar[eé]|no pienso|no voy a pagar|ya no (quiero|deseo)/i,
+  pensar: /lo (voy a )?(pensar|evaluar|ver|consultar|comentar)|voy a (pensar|evaluar|consultar|comentar|ver)|m[aá]s adelante|no puedo hablar|estoy ocupad|ma[ñn]ana me comunic|luego me comunic|me comunico|me comunicar[eé]|tomo conocimiento|estar[eé] comunic/i,
+  masInfo: /por escrito|por correo|al correo|env[ií]e?(me)? (la |el )?informaci|detalle|detallado|documento|cronograma/i,
+  pagoClient: /ya pagu[eé]|ya cancel[eé]\b|ya realic[eé]|realic[eé] (el|mi|la|los) (pago|pagos|cancelaci|dep[oó]sito|transferencia)|hice (el|mi) (pago|dep[oó]sito)|ya (deposit[eé]|transfer[ií])|(adjunto|aqu[ií] (est[aá]|va)|ah[ií] (est[aá]|tiene)|est[aá]n todos)\s*(el |los |mi |la |2 |dos )?(voucher|vaucher|baucher|boucher|comprobante|constancia de pago|captura|pago)|pago realizado|ya est[aá] cancelad|ya pagado/i,
+  pagoAdv: /CANCELADO toda su Deuda|se cancel[oó] la totalidad|ya (se )?(encuentra|est[aá]) cancelad|(recib[ií]|recibimos|hemos recibido|registr[oó]|valid[eé]) (su |el )?(pago|voucher|dep[oó]sito|abono)|pago (registrado|recibido|validado|confirmado|aplicado)|gracias por (su )?(pago|cancelar|haber cancelado)|felicitaciones|se cancel[oó] la (primera|segunda|tercera) cuota|su deuda (ha sido|fue|est[aá]) cancelad|usted (a|ha) cancelado|cancel[oó] su deuda/i,
+  voucherAsk: /voucher|vaucher|baucher|comprobante|constancia de pago|foto|captura/i,
+  acuerdoAdv: /(fue|ha sido|est[aá]|qued[oó]) aprobad[oa]|(?<!una vez )(?<!pre )(?<!pre-)\bAPROBAD[OA]\b(?! en espera)|su compromiso (de|s\/|vigente)|se le recuerda su compromiso|compromiso de pago|(le|les) enviamos el acuerdo de pago|acuerdo de pago vigente|cuenta con un acuerdo de pago|forma del dep[oó]sito|se detalla|fecha (l[ií]mite )?de pago|pactad|foto del voucher|realice (el|la|su) (pago|primera cancelaci|dep[oó]sito)|realizar el (pago|dep[oó]sito)|n[uú]mero de cuenta:?\s*\*?\d|le adjunto el (documento|acuerdo)|acuerdo (ya )?(generado|registrado)/i,
+  acuerdoClientA: /pagar[eé]|depositar[eé]|cancelar[eé]|abonar[eé]|voy a (pagar|depositar|cancelar|abonar|hacer el pago|realizar el pago)|puedo (pagar|depositar|cancelar|abonar)|pago (el|este|ma[ñn]ana|hoy|la pr[oó]xima)|lo (hago|pago|cancelo) (el|este|ma[ñn]ana|hoy)|hasta el \d+/i,
+  acuerdoClientB: /hoy|ma[ñn]ana|lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo|quincena|fin de mes|pr[oó]xima semana|\d{1,2}[\/\-.]\d{1,2}|\d+ de (nov|dic)|esta semana/i,
+  affirm: /^(ok|okey|okis|oki|ya|listo|si|sí|sii|de acuerdo|est[aá] bien|esta bien|perfecto|correcto|conforme|acepto|dale|vale|claro)\b/i,
+  email: /[\w.+-]+@[\w-]+\.[\w.]+/,
+  dni: /\b\d{8}\b/
+};
+const TECHS = [
+  { id:'descuento', nombre:'Descuento / quita', desc:'Se ofrece rebajar la deuda (porcentaje o monto de liquidación) como incentivo.', rx:/descuento|quita|condonaci|rebaja|liquidaci[oó]n inmediata|campa[ñn]a (extra)?ordinaria|beneficio|promoci[oó]n|oferta/i },
+  { id:'urgencia', nombre:'Urgencia / escasez de tiempo', desc:'Se fija una vigencia corta para que decida ya.', rx:/vigencia|24 horas|[uú]ltimo plazo|[uú]ltima oportunidad|v[aá]lid[oa] hasta|vence|hoy mismo|solo (por )?hoy|no pierda|plazo m[aá]ximo|antes de que|tiempo limitado|respuesta inmediata/i },
+  { id:'carta', nombre:'Beneficio: carta de no adeudo / limpiar historial', desc:'Se vende lo que gana el cliente: carta gratuita, volver al sistema financiero, nuevas oportunidades.', rx:/carta de no adeudo|nuevas oportunidades|sistema financiero|activo en el sistema|limpi(ar|o)|historial|reactiv|centrales? de riesgo|vuelva a estar activo/i },
+  { id:'presion', nombre:'Consecuencia / presión legal', desc:'Se advierte de demanda, embargo, instancias judiciales o más gestiones de cobranza.', rx:/demanda|embargo|retenci[oó]n|judicial|extrajudicial|instancias|gestiones de cobranza|poder judicial|apercibimiento|costas|legal\b|reporte negativo/i },
+  { id:'facilidades', nombre:'Facilidades de pago', desc:'Se ofrece fraccionar, pagar en cuotas o por canales cómodos.', rx:/fraccion|cuotas?\b|pagar en partes|flexible|facilidad|cronograma|abono parcial|pago m[ií]nimo|yape|banca m[oó]vil|agencia|ventanilla|aplicativo|app\b/i },
+  { id:'empatia', nombre:'Empatía / acompañamiento', desc:'Se reconoce la situación del cliente y se ofrece ayuda.', rx:/entiendo|comprendo|lamento|con gusto|lo(a)? (puedo )?ayud|ayudarl|cuente con|su situaci[oó]n|estoy para|apoyarl|apoyo|asesor[ií]a personalizada|asesorarl/i },
+  { id:'sondeo', nombre:'Sondeo de la situación', desc:'Preguntas para entender por qué no pagó y cuánto puede pagar.', rx:/por qu[eé] dej[oó]|situaci[oó]n actual|est[aá] trabajando|c[oó]mo viene solventando|cu[aá]nto (puede|podr[ií]a)|motivo|qu[eé] pas[oó]|cu[aá]l es su situaci[oó]n|posibilidad(es)? de pago|con cu[aá]nto cuenta/i },
+  { id:'cierre', nombre:'Cierre directo / pedido de confirmación', desc:'Se pide una respuesta concreta: confirmar, fijar hora o fecha de pago.', rx:/me confirma|conf[ií]rme|conf[ií]rmenos|confirmar|le parece|est[aá] de acuerdo|en qu[eé] momento|a qu[eé] hora|cu[aá]ndo (puede|podr[ií]a|realizar)|puede pagar|cu[aá]l es su respuesta|me indica|una respuesta|respuesta favorable|hoy puede/i },
+  { id:'autoridad', nombre:'Autoridad / respaldo institucional', desc:'Se invoca al banco, a la gerencia o a la excepción aprobada.', rx:/por encargo|aprobaci[oó]n de la gerencia|gerencia|excepci[oó]n|ruc|banco de cr[eé]dito|contigo bcp|estudio jur[ií]dico|analista legal|soluci[oó]n de pago/i },
+  { id:'seguimiento', nombre:'Seguimiento insistente', desc:'Se vuelve a escribir o llamar para recuperar la conversación.', rx:/estamos tratando de comunicarnos|ya pudo evaluar|alguna respuesta|se le recuerda|lo vuelvo a llamar|le llam[eé]|no contest[oó]|sigo a la espera|quedo atent|alguna consulta|ya tiene (alguna )?respuesta|coménteme|comentenos|me comenta/i },
+  { id:'personalizacion', nombre:'Personalización / trato exclusivo', desc:'Se le dice que es un caso especial o que tendrá un asesor dedicado.', rx:/personalizad|su caso|derivaron|asesor (encargado|asignad)|asesora asignada|especial|exclusiv|asesor comercial a cargo/i }
+];
+const CLOSE_RX = /acuerdo de pago|compromiso|formalizar|voucher|vaucher|dep[oó]sito|n[uú]mero de cuenta|correo|enviar(le)? el acuerdo|aprobad/i;
+const PERS_WORDS = [
+  ['descuento',/descuento/i],['beneficio',/beneficio/i],['gratuita / gratis',/gratuit|gratis/i],['oportunidad',/oportunidad/i],
+  ['excepción',/excepci[oó]n/i],['aprobado',/aprobad/i],['vigencia',/vigencia/i],['24 horas',/24 horas/i],['último / última',/[uú]ltim[oa]/i],
+  ['hoy',/\bhoy\b/i],['evite',/evite/i],['carta de no adeudo',/carta de no adeudo/i],['cancelación total',/cancelaci[oó]n (total|de su deuda)/i],
+  ['nuevas oportunidades',/nuevas oportunidades/i],['sistema financiero',/sistema financiero/i],['cuotas / fraccionar',/cuotas?\b|fraccion/i],
+  ['facilidades',/facilidad|flexible/i],['gerencia',/gerencia/i],['ayudar',/ayud/i],['entiendo / comprendo',/entiendo|comprendo/i],
+  ['personalizada',/personalizad/i],['demanda / embargo',/demanda|embargo/i],['judicial',/judicial/i],['plazo',/plazo/i],['confirmar',/confirm/i],
+  ['propuesta',/propuesta/i],['campaña extraordinaria',/campa[ñn]a/i],['sin intereses / condonación',/sin intereses|condonaci/i],['aprovechar',/aproveche|aprovechar/i],
+  ['oferta / promoción',/oferta|promoci[oó]n/i],['ahorro',/ahorr/i],['liquidar',/liquid/i],['regularizar',/regulariz/i],['central de riesgo',/centrales? de riesgo/i]
+];
+const STOP = new Set('de la que el en y a los se del las un por con no una su para es al lo como más mas pero sus le ya o este sí si porque esta entre cuando muy sin sobre también me hasta hay donde quien desde todo nos durante todos uno les ni contra otros ese eso ante ellos e esto mí antes algunos qué que unos yo otro otras otra él tanto esa estos mucho quienes nada muchos cual poco ella estar estas algunas algo nosotros mi mis tú te ti tu tus ellas nosotras vosotros vosotras os mío mía míos mías tuyo tuya suyo suya nuestro nuestra son fue ser está estoy estimado estimada buenos buenas días dias tardes noches buen dia hola gracias favor usted ustedes le les nos puede puedo podemos tiene tienen tengo voy van vamos así asi dni asesor asesora bcp martec ok voucher vaucher baucher deposito depósito ventanilla agencia abono realice realiza fecha enviando recordatorio nivel nacional advertencia comparta detalla limite límite indicada hara primer primera ningun ningún importante cualquier consulta sugerencia whatsapp pdf'.split(' '));
+
+const TEMPLATES = [
+  ['Oportunidad especial (DNI)', /EXCELENTE OPORTUNIDAD/i],
+  ['Último plazo extrajudicial', /[uú]ltimo plazo para cumplimiento/i],
+  ['Propuesta de descuento % (24 h)', /propuesta especial de descuento/i],
+  ['Campaña extraordinaria / conciliación', /GRAN CAMPA|alternativa de conciliaci|proceso de conciliaci/i],
+  ['Aviso legal / demanda', /DEMANDA por obligaci|Estudio Jur[ií]dico|Analista Legal/i],
+  ['Presentación + pedido de DNI', /asesora de cobranza del Estudio|n[uú]mero de DNI|validar su informaci/i],
+  ['Oferta «te ayudamos a solucionar tu deuda»', /te ayudamos a solucionar/i],
+  ['Caso evaluado / aviso de oportunidad', /su caso ha sido evaluado|[uú]ltima oportunidad antes de pasar/i],
+  ['Presentación del estudio (RUC)', /Somos el estudio RUC/i],
+  ['Cuestionario de situación', /por qu[eé] dej[oó] de cumplir/i],
+  ['Acuerdo de pago enviado', /le enviamos el acuerdo de pago|acuerdo de pago para/i]
+];
+
+function normTxt(s){ return String(s==null?'':s).replace(/ | /g,' '); }
+function parseMessages(text){
+  const re = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})(?:\.\d+)? \| (\w+): ?/gm;
+  const out=[]; let m, last=null;
+  const idx=[];
+  while((m=re.exec(text))!==null){ idx.push({i:m.index,end:re.lastIndex,d:m[1],t:m[2],r:m[3]}); }
+  for(let k=0;k<idx.length;k++){
+    const body=text.slice(idx[k].end, k+1<idx.length?idx[k+1].i:text.length).trim();
+    out.push({d:idx[k].d,t:idx[k].t,r:idx[k].r,x:body});
+  }
+  return out;
+}
+const isBroadcast = x => x.length>80 && RX.broadcast.test(x);
+function countMatches(rx, s){ const g=new RegExp(rx.source, rx.flags.includes('g')?rx.flags:rx.flags+'g'); return (s.match(g)||[]).length; }
+
+function extractClientData(row, cols, raw, msgs){
+  let dni = cols.dni ? String(row[cols.dni]||'').trim() : '';
+  if(!dni){
+    const mCtx = raw.match(/(?:DNI|documento|identidad)[^\d]{0,15}(\d{8})\b/i);
+    if(mCtx) dni = mCtx[1];
+    else {
+      const mAny = raw.match(/\b(\d{8})\b/);
+      if(mAny) dni = mAny[1];
+    }
+  }
+  let celular = cols.cliente ? String(row[cols.cliente]||'').replace(/@.*$/,'').trim() : '';
+  let nombre = cols.nombreCliente ? String(row[cols.nombreCliente]||'').trim() : '';
+  if(!nombre){
+    const bad = /^(buenos|buenas|estimado|estimada|cliente|usuario|señor|señora|sr|sra|hola|gracias|por|favor|bcp|martec|estudio|asesor|asesora|equipo|todos|todo|dia|día|tarde|noche|hoy|mañana)$/i;
+    for(const m of msgs){
+      if(m.r==='adviser'){
+        const ms = m.x.match(/(?:Estimad[oa]|Sr\.?|Sra\.?|Señor(?:a)?|Hola)\s+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑa-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑa-záéíóúñ]+){1,3})/);
+        if(ms && !bad.test(ms[1].split(/\s+/)[0]) && ms[1].trim().length>=5){ nombre = ms[1].trim().toUpperCase(); break; }
+      }
+    }
+  }
+  if(!nombre){
+    const mt = raw.match(/(?:Titular|Cliente|Deudor|Nombre)\s*:\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑa-záéíóúñ\s]{4,45}?)(?:\n|\||DNI|Teléfono|Celular|$)/i);
+    if(mt) nombre = mt[1].trim().toUpperCase();
+  }
+  if(!nombre){
+    for(const m of msgs){
+      if(m.r==='client'){
+        const mc = m.x.match(/(?:soy|mi nombre es)\s+([A-ZÁÉÍÓÚÑa-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑa-záéíóúñ]+){1,3})/i);
+        if(mc && mc[1].trim().length>=5){ nombre = mc[1].trim().toUpperCase(); break; }
+      }
+    }
+  }
+  return { dni: dni||'No registrado', celular: celular||'No registrado', nombreCliente: nombre||'No identificado' };
+}
+
+function analyzeConversation(row, cols){
+  const raw = normTxt(cols.texts.map(c=>row[c]||'').join(''));
+  const msgs = parseMessages(raw);
+  const adv = msgs.filter(m=>m.r==='adviser'), cli = msgs.filter(m=>m.r==='client');
+  const cliText = cli.filter(m=>m.x.trim().length>0);
+  const cliOwn = cliText.filter(m=>!isBroadcast(m.x));
+  const idData = extractClientData(row, cols, raw, msgs);
+  const c = {
+    id: row[cols.id]||'', cliente: row[cols.cliente]||'', asesor: (row[cols.asesor]||'(sin nombre)').trim(),
+    dni: idData.dni, celular: idData.celular, nombreCliente: idData.nombreCliente,
+    msgs, nAdv: adv.length, nCli: cli.length, nCliTxt: cliText.length,
+    fecha: msgs.length?msgs[0].d:'', fechaFin: msgs.length?msgs[msgs.length-1].d:''
+  };
+  const bro = adv.filter(m=>isBroadcast(m.x));
+  c.hasTemplate = bro.length>0;
+  const firstAdv = adv.find(m=>m.x.length>0);
+  c.plantilla = 'Mensaje manual / otro';
+  for(const m of adv){ let f=false; for(const [n,rx] of TEMPLATES){ if(rx.test(m.x) && m.x.length>80){ c.plantilla=n; f=true; break; } } if(f) break; }
+  // descuento ofrecido
+  let disc=0;
+  for(const m of adv){ const g=[...m.x.matchAll(/descuento[^%\d]{0,25}\*?(\d{2,3}) ?%|(\d{2,3}) ?% ?(de )?descuento/gi)]; for(const k of g){ const v=+(k[1]||k[2]); if(v>=5&&v<=100) disc=Math.max(disc,v); } }
+  c.descuento = disc||null;
+  const advCustom = adv.filter(m=>!isBroadcast(m.x));
+  const allText = msgs.map(m=>m.x).join('\n');
+  const cliJoined = cliOwn.map(m=>m.x).join('\n');
+  const advCustomJoined = advCustom.map(m=>m.x).join('\n');
+  const cliDebt = countMatches(RX.debt, cliJoined);
+  const advDebt = countMatches(RX.debt, advCustomJoined);
+  const pers = countMatches(RX.personal, allText);
+  const numOnly = msgs.filter(m=>/^[\d\s+-]{7,}$/.test(m.x)).length;
+  const advNum = adv.filter(m=>/^[\d\s+-]{7,}$/.test(m.x)).length;
+  const intHits = countMatches(RX.internal, allText);
+  c.señalesPersonal = pers;
+  const internalNums = (numOnly>=4 || advNum>=2 || intHits>=1) && cliDebt===0 && !c.hasTemplate;
+  c.internalNums = internalNums;
+
+  // ---- Clasificación principal
+  if(c.nCli===0){
+    const dbt = countMatches(RX.debt, allText);
+    if(!c.hasTemplate && (dbt===0 || pers>=2 || internalNums) && msgs.length>0) c.clase='personal';
+    else c.clase='sinrespuesta';
+  } else {
+    const personalLike = (pers>=2 || internalNums) && cliDebt===0 && !c.hasTemplate;
+    c.clase = personalLike ? 'personal' : 'negociacion';
+  }
+  c.subPersonal = c.clase==='personal' ? (c.señalesPersonal>=2 ? 'Personal (amistad / familia)' : 'Interna de trabajo (colegas, listas de DNI/teléfonos)') : null;
+
+  // ---- Embudo (solo negociación)
+  c.interes=false;c.acuerdo=false;c.pago=false;c.pagoProbable=false;c.rechazo=null;c.estado=null;c.objs=[];c.techs=[];c.cutoff=msgs.length;
+  if(c.clase==='negociacion'){
+    // objeciones
+    if(RX.noPuede.test(cliJoined)) c.objs.push('Sin capacidad de pago');
+    if(RX.desconoce.test(cliJoined)) c.objs.push('Desconoce la deuda / número equivocado');
+    if(RX.molesto.test(cliJoined)) c.objs.push('Molestia / reclamo');
+    if(RX.noInteres.test(cliJoined)) c.objs.push('No le interesa');
+    if(RX.pensar.test(cliJoined)) c.objs.push('Pide tiempo / lo evaluará');
+    if(RX.masInfo.test(cliJoined)) c.objs.push('Pide información por escrito');
+    // interés
+    const gaveEmail = cliText.some(m=>RX.email.test(m.x));
+    const intMsg = cliOwn.find(m=>RX.interest.test(m.x));
+    c.interes = !!intMsg || (gaveEmail && c.nCliTxt>=2);
+    c.ev = { interes: intMsg?intMsg.x:'' };
+    // pago por texto
+    const pagoCm = cliOwn.find(m=>RX.pagoClient.test(m.x));
+    const pagoC = !!pagoCm;
+    const pagoAm = adv.find(m=>!/una vez|cuando|puede solicitar|podr[aá]/i.test(m.x.slice(0,60)) && RX.pagoAdv.test(m.x) && !isBroadcast(m.x));
+    const pagoA = !!pagoAm;
+    c.ev.pago = (pagoCm||pagoAm||{}).x||'';
+    c.pago = pagoC || pagoA;
+    c.pagoVia = pagoC && pagoA ? 'cliente y asesor' : pagoC ? 'lo dice el cliente' : pagoA ? 'lo confirma el asesor' : '';
+    // acuerdo
+    let firstAgree = -1;
+    for(let i=0;i<msgs.length;i++){
+      const m=msgs[i];
+      if(m.r==='adviser' && !isBroadcast(m.x) && RX.acuerdoAdv.test(m.x)){ firstAgree=i; break; }
+      if(m.r==='client' && RX.acuerdoClientA.test(m.x) && RX.acuerdoClientB.test(m.x)){ firstAgree=i; break; }
+    }
+    const advAgree = firstAgree>=0 && msgs[firstAgree].r==='adviser';
+    c.ev.acuerdo = firstAgree>=0 ? msgs[firstAgree].x : '';
+    c.acuerdo = c.pago || (firstAgree>=0 && (c.nCli>=1) && (!advAgree || c.nCliTxt>=1 || c.nCli>=2));
+    // pago probable (adjunto sin texto tras pedir voucher)
+    if(!c.pago && c.acuerdo){
+      for(let i=0;i<msgs.length;i++){
+        const m=msgs[i];
+        if(m.r==='client' && m.x===''){
+          for(let j=Math.max(0,i-6);j<i;j++){ if(msgs[j].r==='adviser' && RX.voucherAsk.test(msgs[j].x) && !isBroadcast(msgs[j].x) && (RX.acuerdoAdv.test(msgs[j].x)||/voucher|vaucher|baucher|comprobante/i.test(msgs[j].x))){ c.pagoProbable=true; break; } }
+          if(c.pagoProbable) break;
+        }
+      }
+    }
+    if(c.pago||c.pagoProbable||c.acuerdo) c.interes=true;
+    // rechazo
+    if(!c.interes && c.objs.some(o=>/capacidad|Desconoce|Molestia|No le interesa/.test(o))) c.rechazo=c.objs.find(o=>/capacidad|Desconoce|Molestia|No le interesa/.test(o));
+    c.estado = c.pago?'pago':c.pagoProbable?'probable':c.acuerdo?'acuerdo':c.interes?'interes':c.rechazo?'rechazo':'solo';
+    // técnicas previas al cierre
+    let cut = msgs.length;
+    if(firstAgree>=0) cut=firstAgree;
+    if(c.pago||c.pagoProbable){ const pi=msgs.findIndex(m=>(m.r==='client'&&RX.pagoClient.test(m.x))||(m.r==='adviser'&&RX.pagoAdv.test(m.x)&&!isBroadcast(m.x))); if(pi>=0) cut=Math.min(cut,pi); }
+    if(firstAgree>=0 && !advAgree && c.nCli>=1) cut=firstAgree;
+    c.cutoff=cut;
+    const pre = msgs.slice(0,Math.max(cut,0)).filter(m=>m.r==='adviser').map(m=>m.x).join('\n');
+    const preSrc = pre;
+    c.preText = preSrc;
+    for(const t of TECHS) if(t.rx.test(preSrc)) c.techs.push(t.id);
+    c.closeTech = adv.some(m=>CLOSE_RX.test(m.x) && !isBroadcast(m.x));
+    // frase ganadora: mensaje del asesor antes de aceptación del cliente
+    c.winners=[];
+    if(c.acuerdo || c.pago || c.pagoProbable){
+      for(let i=1;i<msgs.length;i++){
+        if(msgs[i].r==='client' && RX.affirm.test(msgs[i].x.trim()) && msgs[i-1].r==='adviser' && msgs[i-1].x.length>=12 && msgs[i-1].x.length<=260 && !isBroadcast(msgs[i-1].x) && !RX.pagoAdv.test(msgs[i-1].x) && !/whatsapp|RECORDATORIO|CANCELADO/i.test(msgs[i-1].x)) c.winners.push(msgs[i-1].x);
+      }
+    }
+  }
+  return c;
+}
+
+const pct = (a,b)=> b? a/b : 0;
+function analyze(rows){
+  if(!rows.length) throw new Error('El archivo no tiene filas.');
+  const keys = Object.keys(rows[0]);
+  const texts = keys.filter(k=>/^conversacion_texto_\d+$/i.test(k)).sort((a,b)=>parseInt(a.split('_').pop())-parseInt(b.split('_').pop()));
+  if(!texts.length) throw new Error('No encuentro las columnas conversacion_texto_1 … conversacion_texto_10. ¿Es el reporte correcto?');
+  const cols = {
+    texts,
+    id: keys.find(k=>/conversation_id/i.test(k))||keys[0],
+    cliente: keys.find(k=>/numero_cliente|celular|telefono|tel[eé]fono|phone/i.test(k)),
+    dni: keys.find(k=>/^dni$|documento|num_doc|nro_doc/i.test(k)),
+    nombreCliente: keys.find(k=>/nombre_cliente|cliente_nombre|nombres|titular/i.test(k)),
+    asesor: keys.find(k=>/asesor_nombre/i.test(k))
+  };
+  const convs = rows.map(r=>analyzeConversation(r,cols));
+  const R = { total: convs.length, convs };
+  const by = f => convs.filter(f);
+  const personal = by(c=>c.clase==='personal'), sinresp = by(c=>c.clase==='sinrespuesta'), nego = by(c=>c.clase==='negociacion');
+  R.personal = personal.length; R.sinrespuesta = sinresp.length; R.nego = nego.length;
+  R.subPersonal = {}; personal.forEach(c=>R.subPersonal[c.subPersonal]=(R.subPersonal[c.subPersonal]||0)+1);
+  const cnt = s => nego.filter(c=>c.estado===s).length;
+  R.estados = { pago:cnt('pago'), probable:cnt('probable'), acuerdo:cnt('acuerdo'), interes:cnt('interes'), rechazo:cnt('rechazo'), solo:cnt('solo') };
+  R.pagoConfirmado = R.estados.pago; R.pagoProbable = R.estados.probable;
+  R.acuerdos = nego.filter(c=>c.acuerdo).length;
+  R.interesados = nego.filter(c=>c.interes).length;
+  R.interesExplicito = nego.filter(c=>c.interes && !c.acuerdo).length;
+  R.noPagaron = nego.length - R.pagoConfirmado - R.pagoProbable;
+  R.acuerdoSinPago = R.estados.acuerdo;
+  R.pagoViaCounts = {}; nego.filter(c=>c.pago).forEach(c=>R.pagoViaCounts[c.pagoVia]=(R.pagoViaCounts[c.pagoVia]||0)+1);
+  R.contactados = sinresp.length + nego.length; // contactos de cobranza (excluye personales)
+  const dates = convs.map(c=>c.fecha).filter(Boolean).sort();
+  R.desde = dates[0]||''; R.hasta = convs.map(c=>c.fechaFin).filter(Boolean).sort().pop()||'';
+  R.asesores = new Set(convs.map(c=>c.asesor)).size;
+  R.mensajes = convs.reduce((a,c)=>a+c.msgs.length,0);
+
+  // Objeciones
+  const ob={}; nego.forEach(c=>c.objs.forEach(o=>ob[o]=(ob[o]||0)+1));
+  R.objeciones = Object.entries(ob).sort((a,b)=>b[1]-a[1]).map(([k,v])=>({nombre:k,n:v}));
+
+  // Técnicas
+  const won = c=>c.acuerdo||c.pago||c.pagoProbable;
+  R.tecnicas = TECHS.map(t=>{
+    const w=nego.filter(c=>c.techs.includes(t.id)), wo=nego.filter(c=>!c.techs.includes(t.id));
+    const ej = exampleFor(t, nego);
+    return { id:t.id, nombre:t.nombre, desc:t.desc, usos:w.length, pctUso:pct(w.length,nego.length),
+      acuerdosCon:w.filter(won).length, tasaCon:pct(w.filter(won).length,w.length),
+      tasaSin: pct(wo.filter(won).length,wo.length), nSin: wo.length, ejemplo: ej };
+  }).sort((a,b)=>b.usos-a.usos);
+  const cl = nego.filter(c=>c.closeTech);
+  R.cierreDoc = { usos: cl.length, acuerdos: cl.filter(won).length };
+
+  // Palabras de persuasión
+  R.palabras = PERS_WORDS.map(([w,rx])=>{
+    const withW = nego.filter(c=>rx.test(c.preText||'')), wo = nego.filter(c=>!rx.test(c.preText||''));
+    return { palabra:w, rx, n:withW.length, pctUso:pct(withW.length,nego.length), tasaCon:pct(withW.filter(won).length,withW.length), tasaSin:pct(wo.filter(won).length,wo.length), nSin:wo.length };
+  }).filter(p=>p.n>0).sort((a,b)=>b.n-a.n);
+
+  // Palabras sueltas asociadas a acuerdo (solo texto manual previo al cierre)
+  const docFreq={}, docWon={}, capN={}, allN={};
+  nego.forEach(c=>{
+    const orig=c.msgs.slice(0,c.cutoff).filter(m=>m.r==='adviser'&&!isBroadcast(m.x)).map(m=>m.x).join(' ');
+    (orig.match(/[A-Za-záéíóúñÁÉÍÓÚÑ]{4,}/g)||[]).forEach(w=>{const l=w.toLowerCase();allN[l]=(allN[l]||0)+1;if(/^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+$/.test(w)&&!/[.!?¿¡]\s*$/.test(''))capN[l]=(capN[l]||0)+1;});
+    const txt=orig.toLowerCase();
+    const toks=new Set((txt.match(/[a-záéíóúñü]{4,}/g)||[]).filter(t=>!STOP.has(t)));
+    toks.forEach(t=>{ docFreq[t]=(docFreq[t]||0)+1; if(won(c)) docWon[t]=(docWon[t]||0)+1; });
+  });
+  const baseRate = pct(nego.filter(won).length, nego.length);
+  R.baseRate = baseRate;
+  R.palabrasLift = Object.keys(docFreq).filter(t=>docFreq[t]>=12 && !(capN[t]/allN[t]>0.6)).map(t=>({t, n:docFreq[t], tasa:pct(docWon[t]||0,docFreq[t]), lift: pct(docWon[t]||0,docFreq[t])/(baseRate||1)})).sort((a,b)=>b.lift-a.lift).slice(0,24);
+
+  // Frases ganadoras
+  const wm={}; nego.forEach(c=>(c.winners||[]).forEach(x=>{ const k=x.replace(/\s+/g,' ').replace(/\d{6,}/g,'#').slice(0,170); wm[k]=(wm[k]||0)+1; }));
+  R.frasesCierre = Object.entries(wm).sort((a,b)=>b[1]-a[1]).slice(0,12).map(([k,v])=>({texto:k,n:v}));
+
+  // Plantillas / mensaje inicial
+  const pm={};
+  convs.filter(c=>c.clase!=='personal').forEach(c=>{ const p=pm[c.plantilla]||(pm[c.plantilla]={nombre:c.plantilla,envios:0,resp:0,interes:0,acuerdo:0,pago:0}); p.envios++; if(c.clase==='negociacion'){p.resp++; if(c.interes)p.interes++; if(c.acuerdo)p.acuerdo++; if(c.pago||c.pagoProbable)p.pago++;} });
+  R.plantillas = Object.values(pm).sort((a,b)=>b.envios-a.envios);
+
+  // Descuento ofrecido
+  const bk=[[0,49,'< 50 %'],[50,59,'50–59 %'],[60,69,'60–69 %'],[70,79,'70–79 %'],[80,89,'80–89 %'],[90,100,'90 % o más']];
+  R.descuentos = bk.map(([a,b,l])=>{ const g=convs.filter(c=>c.clase!=='personal'&&c.descuento!=null&&c.descuento>=a&&c.descuento<=b); const r=g.filter(c=>c.clase==='negociacion'); return {rango:l,min:a,max:b,envios:g.length,resp:r.length,acuerdo:r.filter(c=>c.acuerdo).length,pago:r.filter(c=>c.pago||c.pagoProbable).length}; }).filter(d=>d.envios>0);
+  R.sinDescuento = convs.filter(c=>c.clase!=='personal'&&c.descuento==null).length;
+
+  // Asesores
+  const am={};
+  convs.forEach(c=>{ const a=am[c.asesor]||(am[c.asesor]={asesor:c.asesor,total:0,personal:0,sinresp:0,nego:0,interes:0,acuerdo:0,pago:0,probable:0}); a.total++; if(c.clase==='personal')a.personal++; if(c.clase==='sinrespuesta')a.sinresp++; if(c.clase==='negociacion'){a.nego++; if(c.interes)a.interes++; if(c.acuerdo)a.acuerdo++; if(c.pago)a.pago++; if(c.pagoProbable)a.probable++;} });
+  R.porAsesor = Object.values(am).sort((a,b)=>b.acuerdo-a.acuerdo||b.nego-a.nego);
+
+  // Por día
+  const dm={};
+  convs.forEach(c=>{ if(!c.fecha||c.clase==='personal')return; const d=dm[c.fecha]||(dm[c.fecha]={fecha:c.fecha,contactos:0,respuestas:0,acuerdos:0}); d.contactos++; if(c.clase==='negociacion'){d.respuestas++; if(c.acuerdo)d.acuerdos++;} });
+  R.porDia = Object.values(dm).sort((a,b)=>a.fecha<b.fecha?-1:1);
+
+  // Mensajes por conversación en acuerdo
+  const wl = nego.filter(won); R.msgsAcuerdoProm = wl.length? wl.reduce((a,c)=>a+c.msgs.length,0)/wl.length : 0;
+  const nl = nego.filter(c=>!won(c)); R.msgsNoProm = nl.length? nl.reduce((a,c)=>a+c.msgs.length,0)/nl.length : 0;
+  return R;
+}
+function exampleFor(t, nego){
+  const cand={};
+  nego.filter(c=>c.acuerdo||c.pago||c.pagoProbable).forEach(c=>{
+    c.msgs.slice(0,c.cutoff).filter(m=>m.r==='adviser'&&m.x.length>10&&m.x.length<260&&t.rx.test(m.x)).forEach(m=>{ const k=m.x.replace(/\s+/g,' ').replace(/\d{6,}/g,'#'); cand[k]=(cand[k]||0)+1; });
+  });
+  let e=Object.entries(cand).sort((a,b)=>b[1]-a[1])[0];
+  if(!e){ nego.forEach(c=>{ c.msgs.filter(m=>m.r==='adviser'&&m.x.length>10&&m.x.length<260&&t.rx.test(m.x)).forEach(m=>{ const k=m.x.replace(/\s+/g,' ');cand[k]=(cand[k]||0)+1;}); }); e=Object.entries(cand).sort((a,b)=>b[1]-a[1])[0]; }
+  return e?e[0]:'';
+}
+if(typeof module!=='undefined') module.exports={analyze,parseMessages};
+
+</script>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const N = n => Number(n).toLocaleString('es-PE');
+const P = (a,b,d=1) => b? (100*a/b).toFixed(d).replace(/\.0$/,'')+' %' : '—';
+const ESTADOS = {
+  pago:{l:'Pagó (confirmado en el chat)',v:'--c-pago',d:'El cliente dice o muestra que pagó, o el asesor confirma el pago / la cancelación.'},
+  probable:{l:'Pago probable (adjunto sin texto)',v:'--c-probable',d:'Había acuerdo, se pidió voucher y el cliente envió un archivo o imagen sin texto.'},
+  acuerdo:{l:'Acuerdo sin pago evidenciado',v:'--c-acuerdo',d:'Hay acuerdo, compromiso de fecha o aprobación, pero el chat no muestra el pago.'},
+  interes:{l:'Interesado, sin acuerdo',v:'--c-interes',d:'Pidió información, descuento, cuotas, carta de no adeudo o dijo que evaluaría pagar.'},
+  rechazo:{l:'Rechazo / no puede',v:'--c-rechazo',d:'Sin capacidad de pago, desconoce la deuda, se molesta o dice que no le interesa.'},
+  solo:{l:'Solo respondió (sin interés claro)',v:'--c-solo',d:'Saludó, dijo «ok» o envió algo sin mostrar intención de negociar.'},
+  sinresp:{l:'Sin respuesta del cliente',v:'--c-sinresp',d:'Solo hay mensajes del asesor (difusión).'},
+  personal:{l:'Personal / interna',v:'--c-personal',d:'Conversación entre colegas, familia o amistades; no es gestión de cobranza.'}
+};
+const keyOf = c => c.clase==='personal'?'personal':c.clase==='sinrespuesta'?'sinresp':c.estado;
+let R=null, EX={estado:'',asesor:'',q:'',limit:80}, SORT={k:'acuerdo',d:-1};
+
+/* ---------- Exportación a Libro Excel con colores ---------- */
+const EXP_MAP = {};
+let EXP_ID = 0;
+function regExp(titulo, fn, slug, hex='1E3A8A', single=false){
+  const id = 'x_' + (++EXP_ID);
+  EXP_MAP[id] = { titulo, fn, slug, hex, single };
+  return id;
+}
+function xBtn(id, inline=false, label='Excel'){
+  return `<button type="button" class="xls-btn${inline?' inline':''}" data-xid="${id}" title="Descargar en Excel con colores">⬇ ${esc(label)}</button>`;
+}
+
+function downloadExcel(titulo, list, slug, hex='1E3A8A', single=false){
+  if(typeof XLSX==='undefined'){ alert('No se cargó el generador de Excel.'); return; }
+  const wb = XLSX.utils.book_new();
+  const bd = {
+    top:{style:'thin',color:{rgb:'CBD5E1'}}, bottom:{style:'thin',color:{rgb:'CBD5E1'}},
+    left:{style:'thin',color:{rgb:'CBD5E1'}}, right:{style:'thin',color:{rgb:'CBD5E1'}}
+  };
+
+  // Hoja 1: Resumen del Ítem
+  const resAoA = [
+    ['RADIOGRAFÍA DE COBRANZA — REPORTE POR ÍTEM'],
+    ['Ítem Evaluado:', titulo],
+    ['Archivo Analizado:', R ? R.archivo : ''],
+    ['Fecha de Descarga:', new Date().toLocaleString('es-PE')],
+    ['Total de Registros:', list.length],
+    [],
+    ['CLASIFICACIÓN / RESULTADO', 'CANTIDAD', 'PORCENTAJE']
+  ];
+  const dist = {};
+  list.forEach(c=>{ const k = ESTADOS[keyOf(c)] ? ESTADOS[keyOf(c)].l : keyOf(c); dist[k]=(dist[k]||0)+1; });
+  Object.entries(dist).sort((a,b)=>b[1]-a[1]).forEach(([k,v])=>{
+    resAoA.push([k, v, list.length ? +(v/list.length).toFixed(4) : 0]);
+  });
+  const wsRes = XLSX.utils.aoa_to_sheet(resAoA);
+  if(wsRes['A1']) wsRes['A1'].s = { font:{bold:true,sz:13,color:{rgb:'FFFFFF'}}, fill:{fgColor:{rgb:hex}}, alignment:{vertical:'center'} };
+  for(let r=1;r<=4;r++){
+    const a=wsRes[XLSX.utils.encode_cell({r,c:0})], b=wsRes[XLSX.utils.encode_cell({r,c:1})];
+    if(a) a.s = { font:{bold:true,color:{rgb:'1E293B'}}, fill:{fgColor:{rgb:'EEF2F6'}}, border:bd };
+    if(b) b.s = { font:{color:{rgb:'0F172A'}}, fill:{fgColor:{rgb:'FFFFFF'}}, border:bd };
+  }
+  for(let c=0;c<3;c++){
+    const h=wsRes[XLSX.utils.encode_cell({r:6,c})];
+    if(h) h.s = { font:{bold:true,color:{rgb:'FFFFFF'}}, fill:{fgColor:{rgb:'0F172A'}}, alignment:{horizontal:c===0?'left':'center'}, border:bd };
+  }
+  for(let r=7;r<resAoA.length;r++){
+    const z = r%2===1 ? 'FFFFFF' : 'F8FAFC';
+    for(let c=0;c<3;c++){
+      const cell=wsRes[XLSX.utils.encode_cell({r,c})];
+      if(cell){
+        cell.s = { font:{color:{rgb:'1E293B'},bold:c===1}, fill:{fgColor:{rgb:z}}, alignment:{horizontal:c===0?'left':'right'}, border:bd };
+        if(c===2) cell.z='0.0%';
+      }
+    }
+  }
+  wsRes['!cols'] = [{wch:44},{wch:22},{wch:16}];
+  XLSX.utils.book_append_sheet(wb, wsRes, 'Resumen');
+
+  // Hoja 2: Datos del Cliente y Evaluaciones
+  const headers = [
+    'N°','DNI','Número Celular','Nombres del Cliente','Asesor','Fecha Inicio','Fecha Fin',
+    'Evaluación / Estado','Clasificación','Plantilla Inicial','Descuento (%)',
+    'Interés','Acuerdo de Pago','Pago Detectado','Vía Confirmación Pago',
+    'Técnicas Aplicadas','Objeciones','Evidencia Interés','Evidencia Acuerdo','Evidencia Pago','Total Mensajes'
+  ];
+  const detAoA = [headers];
+  list.forEach((c, idx)=>{
+    const k = keyOf(c);
+    const est = ESTADOS[k] ? ESTADOS[k].l : k;
+    const cls = c.clase==='personal'?'Personal / Interna':c.clase==='sinrespuesta'?'Sin respuesta':'Negociación';
+    const tchs = (c.techs||[]).map(id=>{ const f=TECHS.find(t=>t.id===id); return f?f.nombre:id; }).join(', ') || 'Ninguna';
+    const objs = (c.objs||[]).join(', ') || 'Ninguna';
+    const pago = c.pago ? 'SÍ (Confirmado)' : c.pagoProbable ? 'PROBABLE (Adjunto)' : 'NO';
+    detAoA.push([
+      idx+1, c.dni, c.celular || c.cliente, c.nombreCliente, c.asesor, c.fecha, c.fechaFin,
+      est, cls, c.plantilla, c.descuento!=null ? c.descuento : '—',
+      c.interes?'SÍ':'NO', c.acuerdo?'SÍ':'NO', pago, c.pagoVia||'—',
+      tchs, objs, (c.ev&&c.ev.interes)||'', (c.ev&&c.ev.acuerdo)||'', (c.ev&&c.ev.pago)||'', c.msgs.length
+    ]);
+  });
+  const wsDet = XLSX.utils.aoa_to_sheet(detAoA);
+  for(let c=0;c<headers.length;c++){
+    const addr = XLSX.utils.encode_cell({r:0,c});
+    if(wsDet[addr]) wsDet[addr].s = { font:{bold:true,sz:11,color:{rgb:'FFFFFF'}}, fill:{fgColor:{rgb:hex}}, alignment:{horizontal:'center',vertical:'center',wrapText:true}, border:bd };
+  }
+  const estColors = {
+    pago:{fill:'DCFCE7',font:'166534'}, probable:{fill:'CCFBF1',font:'115E59'}, acuerdo:{fill:'FFEDD5',font:'9A3412'},
+    interes:{fill:'DBEAFE',font:'1E40AF'}, rechazo:{fill:'FEE2E2',font:'991B1B'}, solo:{fill:'F1F5F9',font:'475569'},
+    sinresp:{fill:'E2E8F0',font:'334155'}, personal:{fill:'EDE9FE',font:'5B21B6'}
+  };
+  for(let r=1;r<detAoA.length;r++){
+    const cObj = list[r-1], k = keyOf(cObj), ec = estColors[k]||{fill:'F8FAFC',font:'0F172A'};
+    const zebra = r%2===1 ? 'FFFFFF' : 'F8FAFC';
+    for(let c=0;c<headers.length;c++){
+      const addr = XLSX.utils.encode_cell({r,c}), cell = wsDet[addr];
+      if(!cell) continue;
+      let fill = zebra, font = '0F172A', bold = (c>=1 && c<=3);
+      if(c>=1 && c<=3){ fill = r%2===1 ? 'EFF6FF' : 'DBEAFE'; font = '1E3A8A'; }
+      else if(c===7){ fill = ec.fill; font = ec.font; bold = true; }
+      else if(c===11 || c===12){
+        if(detAoA[r][c]==='SÍ'){ fill='DCFCE7'; font='166534'; bold=true; } else { fill='F1F5F9'; font='64748B'; }
+      } else if(c===13){
+        if(detAoA[r][c].startsWith('SÍ')){ fill='BBF7D0'; font='14532D'; bold=true; }
+        else if(detAoA[r][c].startsWith('PROBABLE')){ fill='CCFBF1'; font='115E59'; bold=true; }
+        else { fill='FEE2E2'; font='991B1B'; }
+      }
+      cell.s = {
+        font:{sz:10,bold,color:{rgb:font}}, fill:{fgColor:{rgb:fill}},
+        alignment:{horizontal:(c===0||c===1||c===2||c===5||c===6||c===10||c===11||c===12||c===20)?'center':'left',vertical:'center',wrapText:c>=15},
+        border:bd
+      };
+    }
+  }
+  wsDet['!cols'] = [{wch:6},{wch:13},{wch:16},{wch:28},{wch:22},{wch:12},{wch:12},{wch:28},{wch:18},{wch:24},{wch:13},{wch:10},{wch:14},{wch:20},{wch:18},{wch:30},{wch:26},{wch:32},{wch:32},{wch:32},{wch:12}];
+  wsDet['!rows'] = [{hpt:26}];
+  wsDet['!autofilter'] = { ref: XLSX.utils.encode_range({s:{r:0,c:0},e:{r:detAoA.length-1,c:headers.length-1}}) };
+  XLSX.utils.book_append_sheet(wb, wsDet, 'Clientes y Evaluaciones');
+
+  // Hoja 3: Historial del Chat si es caso individual
+  if(single && list.length===1){
+    const ch = list[0];
+    const chAoA = [['Fecha','Hora','Emisor','Mensaje']].concat(ch.msgs.map(m=>[m.d,m.t,m.r==='adviser'?'Asesor ('+ch.asesor+')':'Cliente ('+ch.nombreCliente+')',m.x||'(adjunto sin texto)']));
+    const wsCh = XLSX.utils.aoa_to_sheet(chAoA);
+    for(let c=0;c<4;c++){ const a=wsCh[XLSX.utils.encode_cell({r:0,c})]; if(a) a.s={font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'0F172A'}},border:bd}; }
+    for(let r=1;r<chAoA.length;r++){
+      const adv = ch.msgs[r-1].r==='adviser';
+      for(let c=0;c<4;c++){ const a=wsCh[XLSX.utils.encode_cell({r,c})]; if(a) a.s={font:{sz:10,bold:c===2,color:{rgb:adv?'1E3A8A':'0F172A'}},fill:{fgColor:{rgb:adv?'EFF6FF':'F8FAFC'}},alignment:{wrapText:true,vertical:'top'},border:bd}; }
+    }
+    wsCh['!cols'] = [{wch:12},{wch:10},{wch:26},{wch:80}];
+    XLSX.utils.book_append_sheet(wb, wsCh, 'Conversación');
+  }
+
+  const clean = String(slug||'reporte').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9_-]+/g,'_').replace(/^_+|_+$/g,'').slice(0,42);
+  XLSX.writeFile(wb, clean+'_'+new Date().toISOString().slice(0,10)+'.xlsx');
+}
+
+document.addEventListener('click', e=>{
+  const b = e.target.closest('[data-xid]');
+  if(!b) return;
+  e.stopPropagation();
+  const item = EXP_MAP[b.dataset.xid];
+  if(item) downloadExcel(item.titulo, item.fn(), item.slug, item.hex, item.single);
+});
+
+/* ---------- tema ---------- */
+(function(){
+  const b=$('#themeBtn'); let t=null;
+  b.onclick=()=>{ const dark=(document.documentElement.dataset.theme==='dark')||(!document.documentElement.dataset.theme&&matchMedia('(prefers-color-scheme: dark)').matches); document.documentElement.dataset.theme=dark?'light':'dark'; };
+})();
+
+/* ---------- carga ---------- */
+const drop=$('#drop'), fileIn=$('#file');
+$('#pick').onclick=()=>fileIn.click();
+fileIn.onchange=()=>fileIn.files[0]&&load(fileIn.files[0]);
+['dragover','dragenter'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.add('over')}));
+['dragleave','drop'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.remove('over')}));
+drop.addEventListener('drop',ev=>{const f=ev.dataTransfer.files[0]; if(f) load(f);});
+function setStatus(t,err){const s=$('#status');s.textContent=t;s.className='status '+(err?'err':'muted');}
+function load(file){
+  if(typeof XLSX==='undefined'){ setStatus('No se pudo cargar el lector de Excel (necesita internet para abrir la página la primera vez). Revisa tu conexión y recarga.',true); return; }
+  setStatus('Leyendo «'+file.name+'»…');
+  const fr=new FileReader();
+  fr.onerror=()=>setStatus('No se pudo leer el archivo.',true);
+  fr.onload=e=>{
+    setTimeout(()=>{
+      try{
+        const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+        const t0=performance.now();
+        R=analyze(rows);
+        R.archivo=file.name;
+        render();
+        setStatus('Listo: '+N(R.total)+' conversaciones analizadas de «'+file.name+'» en '+((performance.now()-t0)/1000).toFixed(1)+' s.');
+      }catch(err){ console.error(err); setStatus('No pude analizar el archivo: '+err.message,true); }
+    },30);
+  };
+  fr.readAsArrayBuffer(file);
+}
+
+/* ---------- tooltip ---------- */
+const tip=$('#tip');
+document.addEventListener('mousemove',e=>{
+  const t=e.target.closest&&e.target.closest('[data-tip]');
+  if(!t){tip.style.display='none';return;}
+  tip.textContent=t.getAttribute('data-tip'); tip.style.display='block';
+  tip.style.left=Math.min(e.clientX+14,innerWidth-270)+'px'; tip.style.top=(e.clientY+16)+'px';
+});
+
+/* ---------- gráficos ---------- */
+function barChart(data,key,colorVar,label){
+  const W=640,H=190,pl=34,pb=26,pt=10,max=Math.max(1,...data.map(d=>d[key]));
+  const bw=(W-pl)/data.length, step=Math.max(1,Math.ceil(data.length/10));
+  let s='<svg class="chart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+esc(label)+'">';
+  for(let i=0;i<=3;i++){const y=pt+(H-pb-pt)*(1-i/3); s+='<line x1="'+pl+'" x2="'+W+'" y1="'+y+'" y2="'+y+'" stroke="var(--line)" stroke-width="1"/><text x="'+(pl-6)+'" y="'+(y+4)+'" text-anchor="end">'+Math.round(max*i/3)+'</text>';}
+  data.forEach((d,i)=>{const h=(H-pb-pt)*d[key]/max,x=pl+i*bw+bw*.15,w=bw*.7;
+    s+='<rect data-tip="'+esc(d.fecha+': '+N(d[key])+' '+label.toLowerCase())+'" x="'+x+'" y="'+(H-pb-h)+'" width="'+w+'" height="'+Math.max(h,0)+'" rx="3" fill="var('+colorVar+')"/>';
+    if(i%step===0) s+='<text x="'+(x+w/2)+'" y="'+(H-8)+'" text-anchor="middle">'+d.fecha.slice(5).replace('-','/')+'</text>';});
+  return s+'</svg>';
+}
+function lineChart(data,series,label){
+  const W=640,H=190,pl=34,pb=26,pt=10; const max=Math.max(1,...data.flatMap(d=>series.map(s=>d[s.k])));
+  const n=data.length, x=i=>pl+(n<2?(W-pl)/2:i*(W-pl-8)/(n-1)), y=v=>pt+(H-pb-pt)*(1-v/max), step=Math.max(1,Math.ceil(n/10));
+  let s='<svg class="chart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+esc(label)+'">';
+  for(let i=0;i<=3;i++){const yy=pt+(H-pb-pt)*(1-i/3); s+='<line x1="'+pl+'" x2="'+W+'" y1="'+yy+'" y2="'+yy+'" stroke="var(--line)"/><text x="'+(pl-6)+'" y="'+(yy+4)+'" text-anchor="end">'+Math.round(max*i/3)+'</text>';}
+  series.forEach(se=>{
+    s+='<polyline fill="none" stroke="var('+se.c+')" stroke-width="2" stroke-linejoin="round" points="'+data.map((d,i)=>x(i)+','+y(d[se.k])).join(' ')+'"/>';
+    data.forEach((d,i)=>{ s+='<circle data-tip="'+esc(d.fecha+' · '+se.n+': '+N(d[se.k]))+'" cx="'+x(i)+'" cy="'+y(d[se.k])+'" r="4" fill="var('+se.c+')" stroke="var(--surface)" stroke-width="2"/>'; });
+  });
+  data.forEach((d,i)=>{ if(i%step===0) s+='<text x="'+x(i)+'" y="'+(H-8)+'" text-anchor="middle">'+d.fecha.slice(5).replace('-','/')+'</text>'; });
+  return s+'</svg><div class="legend">'+series.map(se=>'<span><i style="background:var('+se.c+')"></i>'+se.n+'</span>').join('')+'</div>';
+}
+
+/* ---------- render ---------- */
+function render(){
+  Object.keys(EXP_MAP).forEach(k=>delete EXP_MAP[k]);
+  EXP_ID = 0;
+
+  const E=R.estados, pagosTot=E.pago+E.probable;
+  const resp = R.nego;
+  const cont=R.contactados;
+  const kpi=(n,l,s,c,fn,slug,hex)=>{
+    const id = regExp(l, ()=>R.convs.filter(fn), slug, hex||'1E3A8A');
+    return '<div class="kpi"><div class="n">'+(c?'<span class="dot" style="background:var('+c+')"></span>':'')+N(n)+'</div><div class="l">'+l+'</div>'+(s?'<div class="s">'+s+'</div>':'')+xBtn(id)+'</div>';
+  };
+  const ins=insights();
+  const seg=(k,n)=>n?'<div data-tip="'+esc(ESTADOS[k].l+': '+N(n))+'" style="flex:'+n+';background:var('+ESTADOS[k].v+')"></div>':'';
+  const stackAll=['personal','sinresp'].map(k=>seg(k,k==='personal'?R.personal:R.sinrespuesta)).join('')+'<div data-tip="Negociación con clientes: '+N(R.nego)+'" style="flex:'+R.nego+';background:var(--c-nego)"></div>';
+  const lg=(c,t,n,fn,slug,hex)=>{
+    const id = regExp(t, ()=>R.convs.filter(fn), slug, hex);
+    return '<span><i style="background:var('+c+')"></i>'+t+' <b>'+N(n)+'</b> <span class="muted">('+P(n,R.total)+')</span>'+xBtn(id,true)+'</span>';
+  };
+  const f=(t,sub,n,base,prev,c,fn,slug,hex)=>{
+    const id = regExp('Embudo: '+t, ()=>R.convs.filter(fn), slug, hex);
+    return '<div class="f"><div class="t">'+t+'<small>'+sub+'</small></div><div class="bar"><div style="width:'+(base?Math.max(100*n/base,n?1.5:0):0)+'%;background:var('+c+')"></div></div><div class="v">'+N(n)+'<small>'+P(n,base)+' de los contactados'+(prev!=null&&prev!==base?' · '+P(n,prev)+' del paso previo':'')+'</small>'+xBtn(id)+'</div></div>';
+  };
+  const sHex = {pago:'166534',probable:'0F766E',acuerdo:'C2410C',interes:'1D4ED8',rechazo:'B91C1C',solo:'475569'};
+  const stateRows=['pago','probable','acuerdo','interes','rechazo','solo'].map(k=>{
+    const id = regExp(ESTADOS[k].l, ()=>R.convs.filter(c=>c.clase==='negociacion'&&c.estado===k), 'estado_'+k, sHex[k]);
+    return '<div class="state"><i style="background:var('+ESTADOS[k].v+')"></i><div><b>'+ESTADOS[k].l+'</b><small>'+ESTADOS[k].d+'</small></div><div class="num">'+N(E[k])+'<small class="muted"><br>'+P(E[k],resp)+'</small><br>'+xBtn(id)+'</div></div>';
+  }).join('');
+  const objMax=Math.max(1,...R.objeciones.map(o=>o.n));
+  const tech=R.tecnicas.map(t=>{
+    const diff=t.tasaCon-t.tasaSin, ok=t.usos>=15&&t.nSin>=15;
+    const id = regExp('Técnica: '+t.nombre, ()=>R.convs.filter(c=>c.clase==='negociacion'&&c.techs.includes(t.id)), 'tecnica_'+t.id, '1E40AF');
+    return '<div class="tech"><div><h3>'+esc(t.nombre)+'</h3><div class="d">'+esc(t.desc)+'</div>'+xBtn(id)+'</div>'+
+      '<div class="mini"><div class="r"><span>Usada en</span><div class="b"><div style="width:'+(100*t.pctUso)+'%;background:var(--c-nego)"></div></div><span>'+N(t.usos)+'</span></div>'+
+      '<div class="r"><span>Acuerdo con</span><div class="b"><div style="width:'+(100*t.tasaCon)+'%;background:var(--c-pago)"></div></div><span>'+Math.round(100*t.tasaCon)+'%</span></div>'+
+      '<div class="r"><span>Acuerdo sin</span><div class="b"><div style="width:'+(100*t.tasaSin)+'%;background:var(--c-sinresp)"></div></div><span>'+Math.round(100*t.tasaSin)+'%</span></div>'+
+      (ok?'<div class="'+(diff>=0?'pos':'neg')+'">'+(diff>=0?'+':'')+Math.round(100*diff)+' pts frente a no usarla</div>':'<div class="muted">Muestra pequeña para comparar</div>')+'</div>'+
+      '<div>'+(t.ejemplo?'<div class="quote">«'+esc(t.ejemplo.slice(0,230))+(t.ejemplo.length>230?'…':'')+'»</div>':'<span class="muted">Sin ejemplo disponible</span>')+'</div></div>';
+  }).join('');
+  const idCierreDoc = regExp('Técnica: Cierre documental', ()=>R.convs.filter(c=>c.clase==='negociacion'&&c.closeTech), 'cierre_documental', '1E40AF');
+  const wmax=Math.max(1,...R.palabras.map(p=>p.n));
+  const cloud=R.palabras.map(p=>{
+    const id = regExp('Palabra: '+p.palabra, ()=>R.convs.filter(c=>c.clase==='negociacion'&&p.rx.test(c.preText||'')), 'palabra_'+p.palabra, '0F766E');
+    return '<span class="chip" style="font-size:'+(12+10*p.n/wmax).toFixed(1)+'px" data-tip="'+esc(N(p.n)+' conversaciones ('+P(p.n,R.nego,0)+')')+'">'+esc(p.palabra)+' <small>'+N(p.n)+'</small>'+xBtn(id,true,'')+'</span>';
+  }).join('');
+  const wtab=R.palabras.filter(p=>p.n>=10).slice(0,18).map(p=>{
+    const d=p.tasaCon-p.tasaSin;
+    const id = regExp('Palabra: '+p.palabra, ()=>R.convs.filter(c=>c.clase==='negociacion'&&p.rx.test(c.preText||'')), 'palabra_'+p.palabra, '0F766E');
+    return '<tr><td>'+esc(p.palabra)+' '+xBtn(id,true)+'</td><td>'+N(p.n)+'</td><td>'+Math.round(100*p.tasaCon)+'%</td><td>'+Math.round(100*p.tasaSin)+'%</td><td class="'+(d>=0?'pos':'neg')+'">'+(d>=0?'+':'')+Math.round(100*d)+' pts</td></tr>';
+  }).join('');
+  const lift=R.palabrasLift.map(p=>{
+    const id = regExp('Palabra acuerdo: '+p.t, ()=>R.convs.filter(c=>c.clase==='negociacion'&&new RegExp('\\b'+p.t+'\\b','i').test(c.preText||'')), 'palabra_acuerdo_'+p.t, '166534');
+    return '<span class="chip" data-tip="'+esc('En '+p.n+' conversaciones donde el asesor la escribió, '+Math.round(100*p.tasa)+'% terminó en acuerdo o pago')+'">'+esc(p.t)+' <small>×'+p.lift.toFixed(1)+'</small>'+xBtn(id,true,'')+'</span>';
+  }).join('');
+  const idFrases = regExp('Frases que cerraron', ()=>R.convs.filter(c=>c.clase==='negociacion'&&c.winners&&c.winners.length>0), 'frases_cierre', '166534');
+  const frases=R.frasesCierre.length? '<div class="tablewrap"><table><thead><tr><th>Mensaje del asesor justo antes del «ok / de acuerdo / listo» del cliente '+xBtn(idFrases,true)+'</th><th>Veces</th></tr></thead><tbody>'+R.frasesCierre.map(f=>'<tr><td>'+esc(f.texto)+'</td><td>'+f.n+'</td></tr>').join('')+'</tbody></table></div>':'<p class="muted">No se detectaron aceptaciones claras.</p>';
+  const plant=R.plantillas.map(p=>{
+    const id = regExp('Mensaje inicial: '+p.nombre, ()=>R.convs.filter(c=>c.clase!=='personal'&&c.plantilla===p.nombre), 'plantilla_'+p.nombre, '1E3A8A');
+    return '<tr><td>'+esc(p.nombre)+' '+xBtn(id,true)+'</td><td>'+N(p.envios)+'</td><td>'+N(p.resp)+'</td><td>'+P(p.resp,p.envios)+'</td><td>'+N(p.interes)+'</td><td>'+N(p.acuerdo)+'</td><td>'+N(p.pago)+'</td></tr>';
+  }).join('');
+  const desc=R.descuentos.length?R.descuentos.map(p=>{
+    const id = regExp('Descuento: '+p.rango, ()=>R.convs.filter(c=>c.clase!=='personal'&&c.descuento!=null&&c.descuento>=p.min&&c.descuento<=p.max), 'descuento_'+p.rango, '166534');
+    return '<tr><td>'+esc(p.rango)+' '+xBtn(id,true)+'</td><td>'+N(p.envios)+'</td><td>'+N(p.resp)+'</td><td>'+P(p.resp,p.envios)+'</td><td>'+N(p.acuerdo)+'</td><td>'+P(p.acuerdo,p.envios)+'</td><td>'+N(p.pago)+'</td></tr>';
+  }).join(''):'<tr><td colspan="7" class="muted">No se encontraron porcentajes de descuento en los mensajes.</td></tr>';
+  const idAcuTot = regExp('Acuerdos de pago', ()=>R.convs.filter(c=>c.clase==='negociacion'&&c.acuerdo), 'acuerdos_pago', 'C2410C');
+  const idAcuSin = regExp('Acordaron sin pago', ()=>R.convs.filter(c=>c.clase==='negociacion'&&c.estado==='acuerdo'), 'acuerdos_sin_pago', '9A3412');
+  const idPorDia = regExp('Gestiones por día', ()=>R.convs.filter(c=>c.fecha&&c.clase!=='personal'), 'gestiones_por_dia', '1E3A8A');
+  const asesores=[...new Set(R.convs.map(c=>c.asesor))].sort();
+  $('#report').innerHTML=
+  '<nav class="tabs" aria-label="Secciones"><a href="#s1">Resumen</a><a href="#s2">Clasificación</a><a href="#s3">Embudo</a><a href="#s4">Acuerdos y pagos</a><a href="#s5">Técnicas</a><a href="#s6">Palabras</a><a href="#s7">Objeciones</a><a href="#s8">Mensajes y descuentos</a><a href="#s9">Asesores</a><a href="#s10">Por día</a><a href="#s11">Explorador</a><a href="#s12">Método</a></nav>'+
+  '<section class="blk" id="s1"><h2>Resumen</h2><p class="lead">'+esc(R.archivo)+' · del '+esc(R.desde)+' al '+esc(R.hasta)+' · '+N(R.mensajes)+' mensajes · '+N(R.asesores)+' asesores.</p>'+
+  '<div class="grid kpis">'+
+    kpi(R.total,'Conversaciones en el archivo','',null, ()=>true, 'total_conversaciones', '1E3A8A')+
+    kpi(R.personal,'Personales o internas','Se excluyen del análisis de cobranza','--c-personal', c=>c.clase==='personal', 'personales_internas', '5B21B6')+
+    kpi(cont,'Gestiones de cobranza','Clientes contactados','--c-nego', c=>c.clase!=='personal', 'gestiones_cobranza', '1D4ED8')+
+    kpi(R.nego,'Respondieron y conversaron',P(R.nego,cont)+' de los contactados','--c-nego', c=>c.clase==='negociacion', 'respondieron', '2563EB')+
+    kpi(R.interesados,'Interesados',P(R.interesados,R.nego)+' de los que respondieron','--c-interes', c=>c.clase==='negociacion'&&c.interes, 'interesados', '1E40AF')+
+    kpi(R.acuerdos,'Acuerdos de pago',P(R.acuerdos,R.nego)+' de los que respondieron','--c-acuerdo', c=>c.clase==='negociacion'&&c.acuerdo, 'acuerdos_pago', 'C2410C')+
+    kpi(pagosTot,'Pagos',N(E.pago)+' confirmados + '+N(E.probable)+' probables','--c-pago', c=>c.clase==='negociacion'&&(c.pago||c.pagoProbable), 'pagos', '166534')+
+    kpi(cont-pagosTot,'No pagaron',N(R.noPagaron)+' de los que respondieron · '+N(R.sinrespuesta)+' sin respuesta','--c-rechazo', c=>c.clase!=='personal'&&!(c.pago||c.pagoProbable), 'no_pagaron', 'B91C1C')+
+  '</div>'+
+  (ins.length?'<h3 style="margin:20px 0 8px">Hallazgos principales</h3><ul class="insights">'+ins.map(i=>'<li>'+i+'</li>').join('')+'</ul>':'')+'</section>'+
+
+  '<section class="blk" id="s2"><h2>Conversaciones personales vs. negociación</h2><p class="lead">Cada conversación se clasifica por su contenido: si un cliente respondió y se habla de deuda, es negociación; si no hay contexto de cobranza, es personal o interna.</p><div class="card">'+
+    '<div class="stack">'+stackAll+'</div><div class="legend">'+
+      lg('--c-personal','Personales / internas',R.personal, c=>c.clase==='personal', 'clasif_personales', '5B21B6')+
+      lg('--c-sinresp','Cobranza sin respuesta',R.sinrespuesta, c=>c.clase==='sinrespuesta', 'clasif_sin_respuesta', '475569')+
+      lg('--c-nego','Negociación con clientes',R.nego, c=>c.clase==='negociacion', 'clasif_negociacion', '1D4ED8')+
+    '</div>'+
+    (R.personal?'<div class="callout" style="background:var(--surface2);color:var(--ink)"><b>Dentro de las personales:</b> '+Object.entries(R.subPersonal).map(([k,v])=>esc(k)+' <b>'+N(v)+'</b>').join(' · ')+'. Puedes revisarlas una por una en el <a href="#s11" data-go="personal">explorador</a>.</div>':'')+
+  '</div></section>'+
+
+  '<section class="blk" id="s3"><h2>Embudo de la gestión</h2><p class="lead">Cuántos clientes avanzan en cada paso. Los personales no cuentan.</p><div class="card funnel">'+
+    f('Contactados','Gestiones de cobranza',cont,cont,null,'--c-sinresp', c=>c.clase!=='personal', 'embudo_contactados', '475569')+
+    f('Respondieron','Conversaron con el asesor',R.nego,cont,cont,'--c-nego', c=>c.clase==='negociacion', 'embudo_respondieron', '1D4ED8')+
+    f('Interesados','Pidieron información, descuento, cuotas o aceptaron',R.interesados,cont,R.nego,'--c-interes', c=>c.clase==='negociacion'&&c.interes, 'embudo_interesados', '1E40AF')+
+    f('Acuerdo de pago','Aprobación o compromiso de fecha',R.acuerdos,cont,R.interesados,'--c-acuerdo', c=>c.clase==='negociacion'&&c.acuerdo, 'embudo_acuerdos', 'C2410C')+
+    f('Pago','Confirmado o probable',pagosTot,cont,R.acuerdos,'--c-pago', c=>c.clase==='negociacion'&&(c.pago||c.pagoProbable), 'embudo_pagos', '166534')+
+  '</div></section>'+
+
+  '<section class="blk" id="s4"><h2>Acuerdos de pago, pagos y quienes no pagaron</h2><p class="lead">Destino de los '+N(R.nego)+' clientes que respondieron. Cada cliente cae en un solo grupo.</p><div class="grid two"><div class="states">'+stateRows+'</div><div class="card"><h3 style="margin-bottom:8px">Respondieron, por resultado</h3><div class="stack">'+['pago','probable','acuerdo','interes','rechazo','solo'].map(k=>seg(k,E[k])).join('')+'</div>'+
+    '<div style="margin-top:16px" class="grid kpis" ><div class="kpi"><div class="n">'+N(R.acuerdos)+'</div><div class="l">Acuerdos de pago</div><div class="s">incluye los que pagaron</div>'+xBtn(idAcuTot)+'</div><div class="kpi"><div class="n">'+N(R.acuerdoSinPago)+'</div><div class="l">Acordaron pero no hay pago</div><div class="s">pendientes o incumplidos</div>'+xBtn(idAcuSin)+'</div></div>'+
+    '<div class="callout"><b>Importante:</b> el pago se detecta solo por lo escrito en el chat (voucher, «ya pagué», confirmación del asesor). Un cliente puede haber pagado por otro canal sin que aparezca aquí; las cifras de pago son un mínimo.'+(R.pagoViaCounts&&Object.keys(R.pagoViaCounts).length?' Pagos confirmados: '+Object.entries(R.pagoViaCounts).map(([k,v])=>esc(k)+' '+v).join(', ')+'.':'')+'</div></div></div></section>'+
+
+  '<section class="blk" id="s5"><h2>Técnicas usadas para cerrar</h2><p class="lead">Técnicas del asesor antes del cierre, detectadas en '+N(R.nego)+' negociaciones. «Acuerdo con/sin» compara qué porcentaje llegó a acuerdo o pago cuando se usó la técnica y cuando no. Es una asociación, no una prueba de causa.</p><div class="card">'+tech+
+    '<div class="tech"><div><h3>Cierre documental</h3><div class="d">Formalizar con acuerdo de pago, correo, número de cuenta y voucher. Ocurre tras el acuerdo.</div>'+xBtn(idCierreDoc)+'</div><div class="mini"><div class="r"><span>Usada en</span><div class="b"><div style="width:'+(R.nego?100*R.cierreDoc.usos/R.nego:0)+'%;background:var(--c-nego)"></div></div><span>'+N(R.cierreDoc.usos)+'</span></div></div><div class="muted">'+N(R.cierreDoc.acuerdos)+' terminaron en acuerdo o pago.</div></div></div></section>'+
+
+  '<section class="blk" id="s6"><h2>Palabras que se usaron para convencer</h2><p class="lead">Palabras de persuasión que escribió el asesor antes del cierre. El tamaño indica cuántas conversaciones la incluyen.</p><div class="card"><div class="chips">'+cloud+'</div></div>'+
+    '<div class="grid two" style="margin-top:12px"><div><h3 style="margin:6px 0 8px">¿Con esa palabra se acuerda más?</h3><div class="tablewrap"><table><thead><tr><th>Palabra</th><th>Conv.</th><th>Acuerdo con</th><th>Acuerdo sin</th><th>Dif.</th></tr></thead><tbody>'+wtab+'</tbody></table></div></div>'+
+    '<div><h3 style="margin:6px 0 8px">Palabras más asociadas a acuerdo</h3><p class="muted" style="margin-bottom:8px">Texto manual del asesor (sin plantillas). ×N indica cuántas veces más probable es el acuerdo frente al promedio ('+Math.round(100*R.baseRate)+' %). Mínimo 12 conversaciones; se excluyen palabras de trámite (voucher, depósito, ventanilla…).</p><div class="card"><div class="chips">'+lift+'</div></div></div></div>'+
+    '<h3 style="margin:18px 0 8px">Frases que cerraron: lo último que dijo el asesor antes de que el cliente aceptara</h3>'+frases+'</section>'+
+
+  '<section class="blk" id="s7"><h2>Objeciones de los clientes</h2><p class="lead">Qué dijeron los clientes que respondieron. Un mismo cliente puede tener varias.</p><div class="card">'+R.objeciones.map(o=>{
+    const id = regExp('Objeción: '+o.nombre, ()=>R.convs.filter(c=>c.clase==='negociacion'&&c.objs.includes(o.nombre)), 'objecion_'+o.nombre, 'B91C1C');
+    return '<div class="funnel"><div class="f" style="grid-template-columns:minmax(100px,230px) minmax(0,1fr) 64px"><div class="t">'+esc(o.nombre)+' '+xBtn(id,true)+'</div><div class="bar"><div style="width:'+(100*o.n/objMax)+'%;background:var(--c-rechazo)"></div></div><div class="v">'+N(o.n)+'<small>'+P(o.n,R.nego,0)+'</small></div></div></div>';
+  }).join('')+'</div></section>'+
+
+  '<section class="blk" id="s8"><h2>Qué mensaje inicial y qué descuento funcionaron</h2><p class="lead">Respuesta y resultado según el primer mensaje largo del asesor y según el porcentaje de descuento ofrecido.</p><div class="grid two"><div class="tablewrap"><table><thead><tr><th>Mensaje inicial</th><th>Enviados</th><th>Respondieron</th><th>% resp.</th><th>Interés</th><th>Acuerdo</th><th>Pago</th></tr></thead><tbody>'+plant+'</tbody></table></div>'+
+    '<div class="tablewrap"><table><thead><tr><th>Descuento ofrecido</th><th>Enviados</th><th>Respondieron</th><th>% resp.</th><th>Acuerdo</th><th>% acuerdo</th><th>Pago</th></tr></thead><tbody>'+desc+'</tbody></table></div></div></section>'+
+
+  '<section class="blk" id="s9"><h2>Resultados por asesor</h2><p class="lead">Haz clic en un encabezado para ordenar.</p><div class="tablewrap" style="max-height:520px"><table id="advTable"></table></div></section>'+
+
+  '<section class="blk" id="s10"><h2>Evolución por día '+xBtn(idPorDia,true,'Descargar Excel')+'</h2><p class="lead">Según la fecha del primer mensaje de cada conversación.</p><div class="grid two"><div class="card"><h3 style="margin-bottom:6px">Contactos por día</h3>'+barChart(R.porDia,'contactos','--c-nego','Contactos')+'</div><div class="card"><h3 style="margin-bottom:6px">Respuestas y acuerdos por día</h3>'+lineChart(R.porDia,[{k:'respuestas',n:'Respondieron',c:'--c-nego'},{k:'acuerdos',n:'Acuerdos',c:'--c-acuerdo'}],'Respuestas y acuerdos')+'</div></div></section>'+
+
+  '<section class="blk" id="s11"><h2>Explorador de conversaciones</h2><p class="lead">Filtra, busca y abre cualquier chat para ver por qué se clasificó así.</p>'+
+    '<div class="filters"><select id="fEstado" aria-label="Filtrar por clasificación"><option value="">Todas las clasificaciones</option>'+Object.keys(ESTADOS).map(k=>'<option value="'+k+'">'+esc(ESTADOS[k].l)+'</option>').join('')+'</select><select id="fAsesor" aria-label="Filtrar por asesor"><option value="">Todos los asesores</option>'+asesores.map(a=>'<option>'+esc(a)+'</option>').join('')+'</select><input type="search" id="fQ" placeholder="Buscar texto, número de cliente o asesor"><button class="btn ghost" id="xlsListBtn" type="button">Descargar Excel</button><button class="btn ghost" id="copyBtn" type="button">Copiar lista para Excel</button></div>'+
+    '<div class="muted" id="exCount" style="margin-bottom:6px"></div><div class="tablewrap" id="exList"></div><div style="margin-top:10px"><button class="btn ghost" id="moreBtn" type="button" hidden>Mostrar más</button></div></section>'+
+
+  '<details class="meth" id="s12"><summary>Cómo se clasifica cada conversación</summary><ul>'+
+    '<li><b>Sin respuesta:</b> el cliente no escribió nada y hay contexto de cobranza (difusión).</li>'+
+    '<li><b>Personal o interna:</b> hay lenguaje cotidiano (familia, amistades, comida, bromas), chats entre colegas, listas de DNI o teléfonos, y ninguna conversación de deuda con un cliente.</li>'+
+    '<li><b>Negociación:</b> el cliente responde y hay vocabulario de deuda, descuento, pago, carta de no adeudo o una plantilla de cobranza. Los mensajes del cliente que solo reenvían la plantilla no cuentan como interés.</li>'+
+    '<li><b>Interesado:</b> pide información, monto, descuento, cuotas, carta, cómo pagar o una llamada, dice que pagará, o envía su correo. También lo es quien llegó a acuerdo o pago.</li>'+
+    '<li><b>Acuerdo:</b> el asesor informa aprobación, compromiso, forma de depósito, cuenta o fecha de pago y el cliente respondió, o el cliente promete pagar con una fecha.</li>'+
+    '<li><b>Pago:</b> el cliente dice «ya pagué», adjunta voucher, o el asesor confirma cancelación o recepción del pago. «Probable» es un adjunto sin texto después de pedir voucher.</li>'+
+    '<li><b>Técnicas y palabras:</b> se buscan en los mensajes del asesor hasta el momento del primer acuerdo o pago, para no contar los mensajes de formalización como causa del cierre.</li>'+
+    '<li><b>Límites:</b> son reglas de texto. Un pago hecho fuera del chat no se ve y una conversación ambigua puede caer en el grupo equivocado. Usa el explorador para auditar casos.</li></ul></details>';
+
+  $('#empty').hidden=true; $('#report').hidden=false;
+  document.querySelectorAll('[data-go]').forEach(a=>a.onclick=()=>{ EX.estado=a.dataset.go; $('#fEstado').value=EX.estado; EX.limit=80; renderList(); });
+  $('#fEstado').onchange=e=>{EX.estado=e.target.value;EX.limit=80;renderList()};
+  $('#fAsesor').onchange=e=>{EX.asesor=e.target.value;EX.limit=80;renderList()};
+  $('#fQ').oninput=e=>{EX.q=e.target.value;EX.limit=80;renderList()};
+  $('#moreBtn').onclick=()=>{EX.limit+=120;renderList()};
+  $('#copyBtn').onclick=copyList;
+  $('#xlsListBtn').onclick=()=>downloadExcel('Explorador Filtrado', filtered(), 'explorador_conversaciones', '1E3A8A', false);
+  EX={estado:'',asesor:'',q:'',limit:80};
+  renderAdv(); renderList();
+}
+
+function renderAdv(){
+  const cols=[['asesor','Asesor'],['total','Conv.'],['sinresp','Sin resp.'],['nego','Respondieron'],['tr','% resp.'],['interes','Interesados'],['acuerdo','Acuerdos'],['ta','% acuerdo'],['pago','Pagos'],['personal','Personales']];
+  const rows=R.porAsesor.map(a=>({...a,tr:a.nego/Math.max(1,a.nego+a.sinresp),ta:a.nego?a.acuerdo/a.nego:0,pagoT:a.pago+a.probable}));
+  rows.sort((a,b)=>{const x=a[SORT.k],y=b[SORT.k];return (typeof x==='string'?x.localeCompare(y):x-y)*SORT.d;});
+  $('#advTable').innerHTML='<thead><tr>'+cols.map(([k,l])=>'<th><button type="button" data-k="'+k+'">'+l+(SORT.k===k?(SORT.d<0?' ▼':' ▲'):'')+'</button></th>').join('')+'</tr></thead><tbody>'+rows.map(a=>{
+    const id = regExp('Asesor: '+a.asesor, ()=>R.convs.filter(c=>c.asesor===a.asesor), 'asesor_'+a.asesor, '1E3A8A');
+    return '<tr><td>'+esc(a.asesor)+' '+xBtn(id,true)+'</td><td>'+a.total+'</td><td>'+a.sinresp+'</td><td>'+a.nego+'</td><td>'+Math.round(100*a.tr)+'%</td><td>'+a.interes+'</td><td>'+a.acuerdo+'</td><td>'+Math.round(100*a.ta)+'%</td><td>'+a.pagoT+'</td><td>'+a.personal+'</td></tr>';
+  }).join('')+'</tbody>';
+  $('#advTable').querySelectorAll('th button').forEach(b=>b.onclick=()=>{const k=b.dataset.k;SORT=SORT.k===k?{k,d:-SORT.d}:{k,d:k==='asesor'?1:-1};renderAdv();});
+}
+
+function filtered(){
+  const q=EX.q.trim().toLowerCase();
+  return R.convs.filter(c=>{
+    if(EX.estado && keyOf(c)!==EX.estado) return false;
+    if(EX.asesor && c.asesor!==EX.asesor) return false;
+    if(q){ if(c._s===undefined) c._s=(c.asesor+' '+c.cliente+' '+c.dni+' '+c.nombreCliente+' '+c.msgs.map(m=>m.x).join(' ')).toLowerCase(); if(!c._s.includes(q)) return false; }
+    return true;
+  });
+}
+function firstClient(c){ const m=c.msgs.find(m=>m.r==='client'&&m.x&&!isBroadcast(m.x)) || c.msgs.find(m=>m.x); return m?m.x.replace(/\s+/g,' '):''; }
+function renderList(){
+  const L=filtered(); $('#exCount').textContent=N(L.length)+' conversaciones';
+  const show=L.slice(0,EX.limit);
+  $('#exList').innerHTML= show.length? show.map(c=>{
+    const k=keyOf(c);
+    const id = regExp('Caso: '+c.nombreCliente+' ('+c.celular+')', ()=>[c], 'caso_'+c.celular, '1E3A8A', true);
+    return '<div class="row" tabindex="0" data-i="'+R.convs.indexOf(c)+'"><span><span class="pill" style="background:var('+ESTADOS[k].v+')">'+esc(ESTADOS[k].l.split(' (')[0])+'</span></span><span>'+esc(c.asesor.split(' ').slice(0,2).join(' '))+'</span><span>'+esc(c.fecha)+'</span><span class="muted">'+esc(firstClient(c).slice(0,140))+'</span><span>'+c.msgs.length+' msj '+xBtn(id,true,'')+'</span></div>';
+  }).join('') : '<div style="padding:16px" class="muted">Ninguna conversación coincide con los filtros.</div>';
+  $('#moreBtn').hidden = L.length<=EX.limit;
+  $('#exList').querySelectorAll('.row').forEach(r=>{ r.onclick=e=>{if(e.target.closest('[data-xid]'))return;openConv(+r.dataset.i);}; r.onkeydown=e=>{if(e.key==='Enter')openConv(+r.dataset.i)}; });
+}
+function copyList(){
+  const L=filtered(); const rows=[['DNI','Celular','Nombres Cliente','Asesor','Cliente','Fecha','Clasificación','Mensajes']].concat(L.map(c=>[c.dni,c.celular,c.nombreCliente,c.asesor,c.cliente,c.fecha,ESTADOS[keyOf(c)].l,c.msgs.length]));
+  const txt=rows.map(r=>r.join('\t')).join('\n');
+  const done=()=>{$('#copyBtn').textContent='Copiado ✓';setTimeout(()=>$('#copyBtn').textContent='Copiar lista para Excel',1800)};
+  const fb=()=>{const t=document.createElement('textarea');t.value=txt;document.body.appendChild(t);t.select();try{document.execCommand('copy');done()}catch(e){}t.remove()};
+  (navigator.clipboard?navigator.clipboard.writeText(txt).then(done,fb):fb());
+}
+function openConv(i){
+  const c=R.convs[i],k=keyOf(c),m=$('#modal');
+  const ev=[]; if(c.ev){ if(c.ev.pago)ev.push('Evidencia de pago: «'+c.ev.pago+'»'); if(c.ev.acuerdo)ev.push('Evidencia de acuerdo: «'+c.ev.acuerdo+'»'); if(c.ev.interes)ev.push('Evidencia de interés: «'+c.ev.interes+'»'); }
+  if(c.objs&&c.objs.length) ev.push('Objeciones detectadas: '+c.objs.join(', '));
+  if(c.techs&&c.techs.length) ev.push('Técnicas antes del cierre: '+c.techs.map(id=>R.tecnicas.find(t=>t.id===id).nombre).join(', '));
+  const id = regExp('Caso: '+c.nombreCliente+' ('+c.celular+')', ()=>[c], 'caso_'+c.celular, '1E3A8A', true);
+  m.innerHTML='<div class="sheet"><header><div><h3>'+esc(c.asesor)+' · cliente '+esc(c.cliente)+'</h3><div class="muted">'+esc(c.fecha)+' · '+c.msgs.length+' mensajes · <span class="pill" style="background:var('+ESTADOS[k].v+')">'+esc(ESTADOS[k].l)+'</span></div></div><div style="display:flex;gap:8px;align-items:center">'+xBtn(id,true,'Descargar Excel')+'<button class="btn ghost" id="mClose" type="button">Cerrar</button></div></header><div class="chat">'+
+    c.msgs.slice(0,400).map(x=>'<div class="msg '+(x.r==='adviser'?'a':'c')+'">'+(esc(x.x)||'<i class="muted">(sin texto: imagen, audio o archivo)</i>')+'<small>'+(x.r==='adviser'?'Asesor':x.r==='client'?'Cliente':esc(x.r))+' · '+esc(x.d)+' '+esc(x.t)+'</small></div>').join('')+(c.msgs.length>400?'<div class="muted">Se muestran los primeros 400 mensajes.</div>':'')+'</div>'+
+    (ev.length?'<div class="ev">'+ev.map(e=>'<div>'+esc(e.length>420?e.slice(0,420)+'…':e)+'</div>').join('')+'</div>':'')+'</div>';
+  m.classList.add('open'); m.scrollTop=0;
+  $('#mClose').onclick=closeM; $('#mClose').focus();
+}
+function closeM(){ $('#modal').classList.remove('open'); }
+$('#modal').addEventListener('click',e=>{ if(e.target.id==='modal') closeM(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeM(); });
+
+function insights(){
+  const out=[], E=R.estados, cont=R.contactados;
+  out.push('De <b>'+N(cont)+'</b> clientes contactados respondieron <b>'+N(R.nego)+'</b> ('+P(R.nego,cont)+'). Llegaron a acuerdo <b>'+N(R.acuerdos)+'</b> y pagaron o probablemente pagaron <b>'+N(E.pago+E.probable)+'</b> ('+P(E.pago+E.probable,cont)+' de los contactados).');
+  const pl=R.plantillas.filter(p=>p.envios>=30).sort((a,b)=>b.resp/b.envios-a.resp/a.envios);
+  if(pl.length>1) out.push('Mensaje inicial con más respuesta: <b>'+esc(pl[0].nombre)+'</b> ('+P(pl[0].resp,pl[0].envios)+' de '+N(pl[0].envios)+'). El de menor respuesta: <b>'+esc(pl[pl.length-1].nombre)+'</b> ('+P(pl[pl.length-1].resp,pl[pl.length-1].envios)+').');
+  const tt=R.tecnicas.filter(t=>t.usos>=15&&t.nSin>=15).map(t=>({t,d:t.tasaCon-t.tasaSin})).sort((a,b)=>b.d-a.d);
+  if(tt.length&&tt[0].d>0) out.push('Técnica más asociada a acuerdo: <b>'+esc(tt[0].t.nombre)+'</b> ('+Math.round(100*tt[0].t.tasaCon)+'% con ella frente a '+Math.round(100*tt[0].t.tasaSin)+'% sin ella).');
+  if(R.objeciones.length) out.push('Objeción más frecuente: <b>'+esc(R.objeciones[0].nombre)+'</b> en '+N(R.objeciones[0].n)+' conversaciones ('+P(R.objeciones[0].n,R.nego,0)+').');
+  const a=R.porAsesor.filter(x=>x.nego>=15).sort((x,y)=>y.acuerdo/y.nego-x.acuerdo/x.nego)[0];
+  if(a) out.push('Asesor con mayor tasa de acuerdo (mínimo 15 negociaciones): <b>'+esc(a.asesor)+'</b> con '+P(a.acuerdo,a.nego,0)+' ('+a.acuerdo+' de '+a.nego+').');
+  out.push('Una conversación con acuerdo o pago tuvo en promedio <b>'+Math.round(R.msgsAcuerdoProm)+'</b> mensajes, frente a <b>'+Math.round(R.msgsNoProm)+'</b> en las que no cerraron.');
+  return out;
+}
+
+</script>
